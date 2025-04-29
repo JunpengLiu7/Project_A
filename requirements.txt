@@ -1,0 +1,8 @@
+langchain==0.0.340
+openai==0.28.0
+arxiv==2.1.0
+python-dotenv==1.0.0
+pandas==2.0.3
+requests==2.31.0
+chromadb==0.4.15
+tiktoken==0.5.1
