@@ -1,3 +1,4 @@
+# 基础依赖
 langchain==0.0.340
 openai==0.28.0
 arxiv==2.1.0
@@ -6,3 +7,17 @@ pandas==2.0.3
 requests==2.31.0
 chromadb==0.4.15
 tiktoken==0.5.1
+
+# NLP & Embedding 模型
+transformers==4.37.2
+torch==2.1.0
+sentence-transformers==2.2.2
+huggingface_hub==0.20.2
+
+# 图像处理 & Mineru 相关（如有使用）
+pillow>=9.0.0
+paddleocr==2.7.3
+paddlepaddle==2.6.1; platform_system=="Windows"
+
+# 可选：Markdown 转换（如果你生成 Markdown）
+markdownify==0.11.6

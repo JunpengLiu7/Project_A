@@ -44,34 +44,42 @@ class PaperAnalyzer:
         return classification["labels"][0]
 
     def create_vector_db(self, papers_df: pd.DataFrame):
+        """创建向量数据库，带 debug 信息"""
         print("📥 开始构建向量数据库...")
 
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200
         )
-
+        
         docs = []
         for i, row in papers_df.iterrows():
-            content = row.get("structured_text") or row["summary"]
-            full_doc = f"Title: {row['title']}\nText: {content}"
-            docs.append(full_doc)
-            print(f"📄 文档 {i+1}：{row['title']}（{len(full_doc)} 字）")
+            content = f"Title: {row['title']}\nAbstract: {row['summary']}"
+            docs.append(content)
+            print(f"📄 文档 {i+1}：{row['title']}（{len(content)} 字）")
 
+        print(f"🧮 总文档数：{len(docs)}")
         if not docs:
-            print("⚠️ 无文档生成嵌入，终止。")
-            return
+            print("⚠️ 没有可处理的文档！终止创建数据库。")
+            return None
 
         splits = text_splitter.create_documents(docs)
+        print(f"🔪 文本切片后共有：{len(splits)} 段")
 
-        vectordb = Chroma.from_documents(
-            documents=splits,
-            embedding=self.embeddings,
-            persist_directory="./chroma_db"
-        )
-        print("✅ 向量数据库创建成功！")
+        print(f"🔍 使用的嵌入模型：{self.embeddings.model_name}")
+
+        try:
+            vectordb = Chroma.from_documents(
+                documents=splits,
+                embedding=self.embeddings,
+                persist_directory="./chroma_db"
+            )
+            print("✅ 向量数据库创建成功！")
+        except Exception as e:
+            print("❌ 向量数据库创建失败：", str(e))
+            raise
+
         return vectordb
-
 
     def summarize(self, text: str) -> str:
         """摘要生成"""
