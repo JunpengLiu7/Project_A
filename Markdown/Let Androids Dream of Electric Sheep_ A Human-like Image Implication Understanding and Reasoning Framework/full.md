@@ -1,0 +1,348 @@
+# Let Androids Dream of Electric Sheep: A Human-like Image Implication Understanding and Reasoning Framework  
+
+Chenhao Zhang1,2 Yazhe $\mathbf { N i u } ^ { 1 , 3 }$ 1Shanghai AI Laboratory 2Huazhong University of Science and Technology 3The Chinese University of Hong Kong zhangchenhao@pj1ab. org. cn niuyazhe@pj1ab.org. cn  
+
+# Abstract  
+
+Metaphorical comprehension in images remains a critical challenge for AI systems, as existing models struggle to grasp the nuanced cultural, emotional, and contextual implications embedded in visual content. While multimodal large language models (MLLMs) excel in basic Visual Question Answer (VQA) tasks, they struggle with a fundamental limitation on image implication tasks: contextual gaps that obscure the relationships between different visual elements and their abstract meanings. Inspired by the human cognitive process, we propose Let Androids Dream $( { \pmb { L } } { \pmb { A } } { \pmb { D } } )$ , a novel framework for image implication understanding and reasoning. LAD addresses contextual missing through the threestage framework: (1) Perception: converting visual information into rich and multi-level textual representations, (2) Search: iteratively searching and integrating cross-domain knowledge to resolve ambiguity, and (3) Reasoning: generating context-alignment image implication via explicit reasoning. Our framework with the lightweight GPT-4o-mini model achieves SOTA performance compared to $^ { 1 5 + }$ MLLMs on English image implication benchmark and a huge improvement on Chinese benchmark, performing comparable with the GPT-4o model on Multiple-Choice Question (MCQ) and outperforms $3 6 . 7 \%$ on Open-Style Question (OsQ). Additionally, our work provides new insights into how AI can more effectively interpret image implications, advancing the field of vision-language reasoning and human-AI interaction. Our project is publicly available at https: //github. com/MING-ZCH/Let-Androids-Dream-of-Electric-Sheep.  
+
+# 1 Introduction  
+
+Do androids dream of electronic sheep? The question actually has two levels: The first level is to ask if androids dream, and the second level is to ask if they dream of electronic sheep.  
+
+- Philip K. Dick (1968)  
+
+Metaphors are not just abstract concepts found in literature; they are also prevalent in our daily lives. For instance, when we say "time is money" or "life is a journey," we are using metaphors to convey complex ideas in a more contextual and understandable way. These metaphors highlight the integral role that metaphoric thinking plays in human communication and cognition. Just as we use metaphors to make sense of the world around us, we aim to enable AI to understand metaphors in a human-like manner. In linguistic terms, as George Lakoff and Mark Johnson elaborated in "Metaphors We Live By" [11], metaphors are not merely ornamental language devices but fundamental cognitive tools that allow us to conceptualize our surroundings. Metaphors possess characteristics such as systematicity,  
+
+Technical Report  
+
+the creation of similarity, and imaginative rationality. Through cross-domain mapping, one concept can be used to comprehend another, allowing for a more insightful interpretation.  
+
+With the rapid advancement of large language models (LLMs), models such as OpenAI o1 [20], DeepSeek-R1 [4], and QwQ [25] have demonstrated remarkable text-reasoning capabilities. However. a significant amount of knowledge in the real world cannot be fully represented by text alone. Visual information, for instance, contains a wealth of knowledge that is not easily captured through text. As a result, there has been a growing interest in integrating visual information into text-reasoning tasks.  
+
+Compared to language, vision is inherently complex, with its diverse representation of information, subjective understanding, and the difficulty in quantifying its information. In recent years, multimodal reasoning models such as QVQ [24] and K1.5 [23] have achieved outstanding performance. For example, K1.5 model has reached a high score on math, code and multimodal reasoning benchmarks [9, 14, 16, 26, 36]. However, these models still perform poorly on image metaphor questions [15, 37]. They tend to focus on the superficial elements of the image, neglecting the deeper connections and emotional expressions among these elements, as shown in Figure 1. It is important to note that these models excel at logical reasoning tasks, which are based on a different set of cognitive principles compared to image metaphor tasks. In contrast to the VQA task, which primarily centers on concrete image comprehension, the image metaphor entails a stronger emphasis on abstract meaning and higher-order reasoning capabilities. It is not a simple logical reasoning task and requires a different method to understand and generate implications. It requires the model to understand complex and abstract information, such as metaphors, symbols, and emotions in the image, rather than just the concrete contents.  
+
+![](images/11ba86a1333868a12470297663f715874dcd207a116924a59d8763158efcbcf0.jpg)  
+Figure 1: An image is worth a thousand words: For the image implication understanding task, different elements' combination lead to different thinking paths, but the correct path needs all elements with multiple reasoning thoughts.  
+
+Image implication tasks consist of two main aspects: understanding and generation. Understanding image implication is a more complex and challenging task than understanding conventional images. It requires advanced cognitive abilities such as multi-hop reasoning and a sophisticated theory of mind (ToM), which are inherent to human cognition [15, 37]. Compared to understanding, generating implication is even more difficult. The fundamental challenge stems from the lack of contextual understanding of the key elements and internal relationships of the image. This lack of context hinders our ability to decipher the intended message or to create images that effectively convey specific meanings. Without the background of cultural, historical, or environmental context, the significance of key visual components remains elusive, impeding both interpretation and creative expression.  
+
+Existing methods for solving the image metaphor understanding can be mainly divided into two categories: explicit metaphor mapping and model implicit reasoning. The former achieves image metaphor understanding by establishing a correspondence between metaphor ontology and visual representation. For example, the CLOT method [40] realizes image metaphor understanding through the mapping between metaphor ontology and visual representation. Model implicit reasoning relies on the model's reasoning ability and does not require the explicit mapping construction. For example, C4MMD method [32] adopts an untrained chain-of-reasoning approach. However, explicit metaphor mapping, although it can provide a clear mapping, has limitations when dealing with complex manyto-many mappings and dynamically changing cultural backgrounds. On the other hand, model implicit reasoning, despite its potential, still faces challenges in handling complex metaphor understanding tasks, especially in situations involving multimodal information and cultural backgrounds.  
+
+To address these problems, we analyze how humans understand metaphors and find that the essence of the difficulty in metaphor understanding and generation is contextual missing. Therefore, we propose a novel framework that more closely aligns with human cognitive processes for metaphor interpretation. Our framework first transforms visual information into textual representations and then iteratively searches to enrich these representations with out-of-domain knowledge, enabling deeper inferential reasoning. Experiments from both Multiple-Choice Question and Open-Style Question consistently verify the superiority of the proposed framework.  
+
+Our key contributions are listed as follows:  
+
+We systematically analyze image implication tasks and find the difficulty of the metaphor understanding and reasoning task lies in contextual missing. From the perspective of human cognition, we proposed a new direction for solving these tasks - Contextual Alignment. We propose a novel human-like three-stage framework Let Androids Dream (LAD), which implements the lightweight GPT-4o-mini model to achieve SOTA on English image implication benchmark and a huge improvement on Chinese image implication benchmark, comparable with the GPT-4o model and other top closed-source models on Multiple-Choice Question. We design the challenging Open-Style Question (OsQ) with comprehensive metric to automatic evaluate the image implication tasks. This metric aligns $9 5 . 7 \%$ with human annotations, making it more suitable for diverse evaluation. Our LAD outperforms the GPT-4o model $3 6 . 7 \%$ on OSQ.  
+
+# 2 Related Work  
+
+# 2.1 Image Implication  
+
+Image implication encompasses various cognitive aspects, including humor, sarcasm, and broader metaphorical understanding. Early research in this domain focused on specialized aspects, such as humor recognition [6, 7] and sarcasm detection [5]. As the rapid development of large language models (LLMs) brings new opportunities for analyzing image implication, we need more comprehensive evaluation frameworks. DeepEval [34] provided a systematic taxonomy of image implications. Subsequently, HI-Bench [15] emerged as the first English image implication benchmark, followed by CII-Bench [37], which extended this evaluation framework to Chinese images. Image implication understanding requires sophisticated multi-hop reasoning and theory of mind (ToM) capabilities [15, 37]. Existing approaches fallinto two categories: explicit metaphor mapping and model implicit reasoning. The first approach, represented by CLOT [40], constructs mappings between metaphor ontologies and visual representations. However, this approach faces key challenges: metaphorical relationships have complex many-to-many mappings that are difficult to formalize, and cultural references are too dynamic for static mappings. The second approach, exemplified by C4MMD [32], employs training-free CoT reasoning. Despite its promise, this approach struggles with the complex nature of metaphorical understanding, which surpasses traditional reasoning. The large search space for out-of-domain reasoning and changing cultural contexts limits its effectiveness. To address this, we propose a novel methodology that transforms visual information into texts and iteratively enriches them with out-of-domain knowledge, better aligning with human cognitive processes.  
+
+# 2.2 Vision-language Reasoning  
+
+The rapid advancement of LLMs has demonstrated remarkable text reasoning capabilities, as evidenced by models such as o1 [20], DeepSeek-R1 [4], and QwQ [25, 33]. However, real-world knowledge often transcends textual representation, with visual information encapsulating substantial world knowledge that pure language models cannot access. For example, images inherently contain rich, multi-layered information that often resists straightforward textual description, including spatial relationships, contextual nuances, and implicit knowledge that humans process intuitively. This limitation has driven research toward integrating visual information into text-based reasoning frameworks. Current research has developed three primary approaches to incorporate visual information into model reasoning: 1) Comprehensive MLLM Description: This approach treats visual content as a text grounding problem, as demonstrated by LLAVA-COT [31] and Mulberry [35]. 2) Multi-turn MLLM Interaction: Models like VoCoT [13] and ${ \mathbf V } ^ { * }$ [28] employ iterative question-answering to extract fine-grained visual information at various levels of detail. 3) Tool-augmented Reasoning: Frameworks such as Visual Sketchpad [8] and Whiteboard-of-Thought [17] leverage tool-based approaches to modify images and augment reasoning with prior knowledge embedded in these tools.  
+
+![](images/02188999aaf7bd8ca298ca882dfa23603791474c452c550bd28906c3c91b8268.jpg)  
+Figure 2: The general framework of Let Androids Dream (LAD), which includes three stages: (1) Perception: converting raw visual information into rich and multi-level textual representations, (2) Search: iteratively searching and integrating cross-domain knowledge to resolve ambiguity, and (3) Reasoning: generating context-alignment image implication interpretations via explicit reasoning.  
+
+# 3 Method  
+
+Inspired by the human cognitive process, we introduce a new paradigm for solving image implication tasks - Contextual Alignment. We have a detailed discussion for this point in Section 1 and Section 5. Therefore, we propose Let Androids Dream (LAD), a novel framework for image implication understanding and reasoning. This framework operates through the three-stage framework, as shown in Figure 2: (1) Perception: converting visual information into rich and multi-level texts, (2) Search: iteratively searching and integrating cross-domain knowledge to resolve ambiguity, and (3) Reasoning: generating context-alignment analysis via explicit reasoning.  
+
+# 3.1 Stage I: Perception  
+
+The initial stage, Perception, aims to transform raw visual inputs into structured, hierarchical textual representations, mirroring the human cognitive process of initial intuition-driven observation and subsequent identification of key elements. This stage operates in a manner analogous to human System 1 (intuitive, holistic processing) and System 2 (analytical, focused processing).  
+
+First, we utilize MLLM to process the input image and produce a detailed textual narrative. This description captures coarse-grained visual information, including discernible text within the image, prominent colors, overall layout, and salient objects or entities. This step provides a holistic foundational understanding of the content of the image. Following this, we derive a fine-grained keyword set. The MLLM condenses the above image description into a concise set of approximately 7 keywords. These keywords are specifically chosen to encapsulate critical aspects relevant to implication understanding, such as the perceived emotion, the domain or context (e.g., political, social, cultural) and any rhetorical devices that might be visually suggested. Keywords also re-emphasize crucial textual elements or entities identified in the description. This two-tiered representation, comprising a rich description and focused keywords, provides a robust foundation for the subsequent Search and Reasoning stages by converting unstructured visual data into actionable textual information. The keywords, in particular, serve as vital cues for guiding the knowledge retrieval in stage II.  
+
+# 3.2 Stage II: Search  
+
+The Search stage addresses semantic ambiguities and enhances contextual comprehension by itera tively retrieving and integrating cross-domain knowledge critical for interpreting image implications.  
+
+This stage employs adaptive search, which dynamically selects the most appropriate search method.   
+The process is systematically organized into three main phases: Plan, Search, and Summary.  
+
+1. Plan: The process begins by formulating targeted search queries. Using the keywords generated in Stage I, the MLLM, guided by a prompt specifically designed for image implication tasks, generates five different levels of search questions. These questions aim to uncover latent meanings, cultural references, or background information pertinent to the image implications.  
+
+2. Search: This phase executes the search based on the generated questions, employing the Self-Judge mechanism to determine the optimal search strategy for each question.  
+
+(a) Self-Judge: The MLLM acts as a judge, assigning a confidence score to each search question. This score reflects criteria such as the perceived popularity or commonness of the knowledge required, relevance to real-time or recent events, and whether the question involves contemporary internet slang or meme culture. Questions scoring high, indicating a need for up-to-date or niche information, are routed to WebSearch. Questions scoring low, suggesting the answer might reside within general world knowledge, are directed to ModelSearch. This adaptive routing optimizes for both knowledge coverage and inference efficiency.  
+
+(b) ModelSearch: For questions deemed suitable for internal knowledge retrieval, ModelSearch leverages the MLLM's own parametric memory. Using a specialized prompt, the model directly generates an answer based on its pre-trained knowledge base. This approach is efficient for recalling established facts or common concepts.  
+
+(c) WebSearch: For questions requiring external, dynamic, or highly specific information, WebSearch is invoked. Inspired by LLM search methods like MindSearch [3], but focusing on image implication tasks, our WebSearch component first employs the planner. The planner, acting as a high-level strategist, decomposes the initial search question into a series of more granular sub-questions. These sub-questions are structured into a directed acyclic graph (DAG), simulating a multi-step, exploratory information-seeking process. Subsequently, the searcher executes this plan. It performs hierarchical information retrieval for each sub-question from the internet, gathering relevant snippets and facts. This multi-agent method, with distinct planner and searcher modules, allows for parallel processing and dynamic refinement of the search strategy. The retrieved information for sub-questions is then synthesized to answer the original search question. This ensures access to recent developments and a broad spectrum of public knowledge, crucial for understanding contemporary image implications.  
+
+3. Summary: The raw outputs from the Search phase are refined into a concise search summary.  
+
+(a) RankSummary: The set of five question-answer pairs is evaluated. The MLLM ranks these pairs based on their relevance to understanding the core implication of the original image. The top three most relevant question-answer pairs are selected.  
+
+(b) RefineSummary: The selected pairs are further processed. The MLLM, guided by the ranking reason from the ranking step, rewrites and consolidates these pairs. This involves removing irrelevant or redundant information, reconciling diverse pieces of information, and potentially supplementing details to create a single, optimized, and concise search summary. This final summary serves as the enriched contextual input for Stage III.  
+
+# 3.3 Stage III: Reasoning  
+
+The final stage, Reasoning, performs explicit reasoning to derive contextually grounded interpretations of image implications. This stage synthesizes all previously gathered information -- the hierarchical textual representations from Stage I (descriptions and keywords) and the domain-enriched knowledge from Stage II - into a coherent implication framework.  
+
+For image implication tasks, we employ a specific reasoning format. The MLLM is prompted to articulate its reasoning trajectory using designated markers, such as "<think> ...</think>" special tokens. Within these markers, the model explicitly lays out its step-by-step reasoning process, connecting the visual cues, keywords, and external knowledge to arrive at the final image implication analysis and explanation. This domain-specific CoT method not only guides the model towards a more robust and grounded output, but also makes the inferential pathway transparent. The framework ultimately generates a contextually-aligned implication understanding that emerges from the integration of visual-semantic inputs and cross-domain knowledge, formalizing the LAD system's capacity for evidence-based visual reasoning.  
+
+<html><body><table><tr><td rowspan="2">Model</td><td colspan="2">Multiple-Choice Question</td><td colspan="2">Open-Style Question</td></tr><tr><td>en</td><td>zh</td><td>en</td><td>zh</td></tr><tr><td colspan="5">General Models</td></tr><tr><td>Qwen2.5-VL-7B [2]</td><td>46%</td><td>40%</td><td>2.34</td><td>2.58</td></tr><tr><td>DeepSeek-VL2 [29]</td><td>46%</td><td>36%</td><td>2.82</td><td>2.86</td></tr><tr><td>Gemini-2.0-flash [22]</td><td>70%</td><td>68%</td><td>1.60</td><td>3.12</td></tr><tr><td>QwenVL-2.0-72B [27]</td><td>68%</td><td>54%</td><td>2.84</td><td>3.04</td></tr><tr><td>QwenVL-2.5-72B [2]</td><td>72%</td><td>56%</td><td>1.56</td><td>3.12</td></tr><tr><td>GLM-4V-plus [39]</td><td>64%</td><td>64%</td><td>3.01</td><td>3.12</td></tr><tr><td>Gemini-2.0-pro [22]</td><td>68%</td><td>62%</td><td>1.66</td><td>3.18</td></tr><tr><td>Grok-3 [30]</td><td>66%</td><td>64%</td><td>3.24</td><td>2.96</td></tr><tr><td>Claude-3.5-Sonnet [1]</td><td>68%</td><td>62%</td><td>3.22</td><td>3.78</td></tr><tr><td>GPT-4o [19]</td><td>74%</td><td>58%</td><td>2.94</td><td>3.76</td></tr><tr><td>GPT-4.1 [19]</td><td>74%</td><td>62%</td><td>3.30</td><td>3.92</td></tr><tr><td colspan="5">Vision-language Reasoning Models</td></tr><tr><td>Gemini-2.0-flash-thinking [22]</td><td>64%</td><td>68%</td><td>1.66</td><td>2.84</td></tr><tr><td>QVQ-72B [24]</td><td>62%</td><td>56%</td><td>3.10</td><td>3.42</td></tr><tr><td>Doubao-1.5-thinking-vision-pro [21]</td><td>66%</td><td>66%</td><td>3.16</td><td>3.90</td></tr><tr><td>Grok-3-reasoning [30]</td><td>74%</td><td>64%</td><td>3.06</td><td>2.92</td></tr><tr><td colspan="5">Our Method</td></tr><tr><td>GPT-4o-mini [19]</td><td>44%</td><td>42%</td><td>2.98</td><td>3.36</td></tr><tr><td>+ LAD (Stage I + III)</td><td>68% </td><td>44% </td><td>3.84 </td><td>3.58 </td></tr><tr><td>+ LAD (Stage I + II + III)</td><td>74% </td><td>52% </td><td>4.02 </td><td>3.66 </td></tr><tr><td>Improv.</td><td>+30 (68.2%)</td><td>+10 (23.8%)</td><td>+1.04 (34.9%)</td><td>+0.3 (8.9%)</td></tr></table></body></html>
+
+Table 1: Overall results of different models on Multiple-Choice Question and Open-Style Question. The best-performing model in each category is in-bold, and the second best is underlined.  
+
+# 3.4LAD Pipeline  
+
+The Let Androids Dream (LAD) framework operates as a sequential pipeline, integrating the three distinct stages described in Figure 2 and Algorithm 1. Stage I (Perception) initiates the process. It takes an input image and employs the MLLM to generate a comprehensive image description. This description is then further processed to extract seven salient keywords. The outputs of this stage are the image description and the set of keywords. These keywords serve as the primary input for Stage II (Search). Here, the MLLM transforms the keywords into five targeted search questions. A self-judge mechanism then directs these questions to either ModelSearch (for internal knowledge retrieval) or WebSearch (for external, dynamic information). The resulting question-answer pairs are ranked for relevance, with the top three being selected and subsequently refined into a concise search summary. This search summary is the key output of Stage II. Finally, Stage II(Reasoning) receives the original image, the image description and keywords from Stage I, and the search summary from Stage II. The MLLM integrates these multi-modal inputs and, through an explicit reasoning process (guided by a structured CoT), generates the final image implication. This implication represents the culmination of the LAD pipeline's understanding and reasoning about the input image.  
+
+# 4 Experiment  
+
+# 4.1 Baselines  
+
+Models. To comprehensively compare with LAD, we carefully select a diverse range of MLLMs, encompassing both open-source and closed-source models, with the aim of covering a wide spectrum of model characteristics and scales. These models span parameter sizes from 7B to 300B, ensuring that models of varying complexity and capability are thoroughly assessed. In selecting the models, we focus on the following key aspects: 1) General and Reasoning models, 2) Open-Source and Closed-Source models, and 3) model parameter scaling law. The experiment setup is in Appendix B.  
+
+![](images/eb71c8f2bed264cebac89d0f752c8c1a719bd39bb4825e68fcbfd6794120471e.jpg)  
+Figure 3: A case study of different methods on Multiple-Choice Question. The End2End method shows superficial reasoning and the CoT method shows over-inference, while our $L A D$ framework shows the correct path via more contextual alignment analysis. The full prompt is listed in Ap. pendix D.  
+
+Evaluation. Our evaluation utilizes two comprehensive image implication benchmarks, II-Bench [15] and CII-Bench [37], both featuring Multiple-Choice Question (MCQ). Furthermore, we manually construct a high-quality benchmark by randomly selecting 50 images from varied image types like illustrations and comics. And we measure accuracy by comparing the model's selected option to the ground truth. Aware of potential MCQ biases [12, 18, 38] and the greater difficulty of generation over judgment tasks, we introduce a novel evaluation method Open-Style Question (OsQ). It uses the same images with the fixed question: "What is the implication in this image?'. And we use GPT-40 with a specialized evaluation metric as evaluators, validated by multiple human consistency checks.  
+
+# 4.2 Multiple-Choice Question  
+
+# 4.2.1 Implementation Details  
+
+Our high-level benchmark includes diverse images such as comics, posters, illustrations, English and Chinese Internet memes, and Chinese traditional artworks, all rich in visual information and cultural significance. Each image is paired with one question, each offering six options with only one correct answer. The question is "What is the implication in this image?" (mostly) or different levels of image understanding, such as overarching interpretation and nuanced details. A case study of different methods on MCQ is in Figure 3.  
+
+# 4.2.2 Results and Analysis  
+
+Table 1 presents comprehensive results of MCQ across different MLLMs on our high-level benchmark. The LAD framework demonstrates remarkable effectiveness, achieving SOTA performance with the lightweight GPT-4o-mini model. In English MCQ, our framework matches the performance of closed-sourced models like GPT-4o, GPT-4.1, and Grok-3-reasoning $( 7 4 \% )$ , while significantly outperforming Claude-3.5-Sonnet and Gemini-2.0-pro by $9 \%$ . For Chinese MCQ, our framework achieves comparable results to GPT-4o, while substantially surpassing DeepSeek-VL2 by $4 4 . 4 \%$  
+
+The improvement over the base GPT-4o-mini model is particularly noteworthy, with relative improvements of $6 8 . 2 \%$ for English and $2 3 . 8 \%$ for Chinese, far exceeding the capabilities of other open-source and reasoning models. Interestingly, we observe that reasoning models show a minimal advantage  
+
+# Evaluation Metric  
+
+# 1. Surface-level Information:  
+
+# Evaluation Standard  
+
+Identification of primary entities within the image Analysis of color composition and application Recognition of intricate details and their significance  
+
+# 2. Emotional Expression:  
+
+Identification of conveyed emotions (e.g., tranquility, intensity, melancholy) Depth of emotional resonance and its alignment with the image's theme Consistency of emotional expression across the image's elements  
+
+# 3. Domain and Context:  
+
+Recognition of the image's domain (e.g., art, commerce.   
+social commentary) : Contextualization within its cultural, historical, or   
+societal background Evaluation of the image's innovation within its domain  
+
+# 4. Rhetorical Skills:  
+
+Identification of rhetorical devices (e.g., symbolism contrast, personification) Analysis of how rhetorical techniques enhance the image's expression Integration of rhetorical devices with metaphorical implications to create a cohesive interpretation  
+
+# 5. Deep Implications:  
+
+# [1 point]:  
+
+Fails to capture key elements within the image (such as text, and important entities). Does not identify emotions, domain, or rhetorical devices. Only provides a superficial description of surface-level information, lacking depth and creativity, with a significant gap from the standard answer.  
+
+# [2 points]:  
+
+Captures some key elements within the image, but the identification of emotions, domain, and rhetorical devices is vague. The description of surface-level information is relatively complete, but there is a clear deficiency in exploring deeper meanings, showing a noticeable gap from the standard answer.  
+
+# [3 points]:  
+
+Effectively captures key elements within the image and initially identifies emotions, domain, and rhetorical devices. The description of surface-level information is relatively accurate, and there is some relevant expression of deep meanings. However, there is still room for improvement in depth and creativity, and it is generally close to the standard answer.  
+
+# [4 points]:  
+
+Accurately captures key elements within the image and clearly identifies emotions, domain, and rhetorical devices. The description of surface-level information is detailed and precise, with a relatively deep exploration of deep meanings, demonstrating a certain level of creativity and depth. It is largely consistent with the standard answer but may have minor deficiencies in some details or depth.  
+
+# [5 points]:  
+
+Accurately and precisely captures key elements within the image and profoundly identifies emotions, domain, and rhetorical devices. The description of surface-level information is comprehensive and precise, with unique insights into deep meanings, skillfully integrating image elements with metaphorical implications. It demonstrates exceptional creativity and depth, is highly consistent with the standard answer, and shows a profound grasp of metaphor creation and cultural understanding.  
+
+over general models on image implication task, with comparable accuracy rates across categories. This finding suggests that current RL-based reasoning approaches exhibit limited generalization capability for image implication understanding, underscoring the distinct complexity of this task compared to basic VQA tasks and classic logical reasoning domains like math and code.  
+
+# 4.3 Open-Style Question  
+
+# 4.3.1Implementation Details  
+
+Evaluation Metric. To comprehensively assess MLLMs' understanding of image implication, we develop a multifaceted evaluation metric. This metric is designed to probe both the surface-level information readily apparent in the image and the deeper emotion, domain and rhetorical skills that inform its creation and interpretation. Our evaluation metric encompasses five key perspectives: Surface-level Information, Emotional Expression, Domain and Context, Rhetorical Skills, and Deep Implications. For each perspective, we give its detailed description in Figure 4.  
+
+MLLM-based Automatic Evaluation. To evaluate image implication comprehension in MLLMs, we develop an MLLM-based evaluation standard based on evaluation metrics, as illustrated in Figure 4. Our experiment utilize the same dataset from MCQ experiment, comprising 50 English images and 50 Chinese images. We employ human-written descriptions and implication interpretations as ground truth. We choose the same MLLMs with MCQ experiment to generate image implications for these images, which are subsequently scored using GPT-4o and our evaluation standard. The evaluation prompt is in Appendix D. To validate the model's scoring efficacy, we enlist $1 6 \mathrm { P h D }$ students and researchers well-versed in English and Chinese metaphorical imagery to independently score the dataset. The human-model scoring consistency reached $9 5 . 7 \%$ , affirming the method's validity. The detailed human-model consistency study is in Appendix C.  
+
+# 4.3.2 Results and Analysis  
+
+Table 1 presents comprehensive results of OSQ across different MLLMs on our high-level benchmark. The LAD framework demonstrates exceptional effectiveness, achieving SOTA performance with the lightweight GPT-4o-mini model. In English OSQ, our framework substantially outperforms closed-sourced models like GPT-4o by $3 6 . 7 \%$ and Claude-3.5-Sonnet by $2 4 . 8 \%$ . For Chinese OSQ, while slightly below top closed-sourced models like GPT-4.1 and Doubao-1.5-thinking-vision-pro, our method still significantly surpasses Gemini-2.0-pro by $1 5 . 1 \%$ and DeepSeek-VL2 by $30 \%$  
+
+<html><body><table><tr><td>Model</td><td colspan="2">Multiple-Choice Question</td><td colspan="2">Open-Style Question</td></tr><tr><td></td><td>en</td><td>zh</td><td>en</td><td>zh</td></tr><tr><td colspan="5">GPT-4o-mini</td></tr><tr><td>w/o CoT</td><td>44%</td><td>42%</td><td>2.98</td><td>3.36</td></tr><tr><td>Standard CoT</td><td>50% </td><td>42%</td><td>3.10 </td><td>3.28 </td></tr><tr><td>LAD-CoT</td><td>68% </td><td>44% </td><td>3.84 </td><td>3.58 </td></tr></table></body></html>
+
+Table 2: Results of different CoT methods. Our LAD-CoT method achieves the best improvement. The best-improvement method in each category is in-bold.  
+
+The enhancement over the GPT-4o-mini is particularly noteworthy, with improvements of $3 4 . 9 \%$ for English and $8 . 9 \%$ for Chinese, far exceeding other open-source and reasoning models. Unlike MCQ results, we observe significant performance disparities between reasoning and general models on OSQ, highlighting the distinct challenges of image implication generation. Interestingly, several models (e.g., QwenVL-2.5-72B, Gemini-2.0-pro) exhibit substantial performance gaps between MCQ and OsQ. Upon manual examination of model outputs, we attribute this to potential overfitting to multiple-choice formats and insufficient exposure to open-style generation tasks. In addition, LLMs or even MLLMs may not genuinely understand the questions but rather predict options as answers, introducing evaluation bias and demonstrating sensitivity to option positioning [38].  
+
+# 4.4 Ablation Study  
+
+# 4.4.1Stage I (Perception) and Stage III (Reasoning)  
+
+We incorporate LAD's Stage I (Perception) and Stage III (Reasoning), collectively LAD-CoT. This method shows significant improvements in Table 1, with GPT-4o-mini scores increasing from $44 \%$ to $68 \%$ (English) in the MCQ, and from 2.98 to 3.84 (English) and 3.36 to 3.58 (Chinese) in the OSQ  
+
+Compared to standard CoT, the results are shown in Table 2. While standard CoT offers minor gains in English (MCQ: $44 \%$ to $50 \%$ ; OSQ: 2.98 to 3.10), it shows no improvement or even a slight decline in Chinese (MCQ: $42 \%$ unchanged; OSQ: 3.36 to 3.28). In contrast, LAD-CoT substantially outperforms both the baseline and standard CoT across all types. For instance, LAD-CoT achieves $68 \%$ on English MCQ while standard CoT only $50 \%$ , and a score of 3.84 on English OSQ compared to 3.10 for standard CoT. These findings highlight the superior efficacy of our LAD-CoT for image implication over standard CoT methods. A case study of various CoT on MCQ is in Figure 3. The standard CoT prompt and other details is in Appendix D.  
+
+# 4.4.2Stage II (Search)  
+
+We conduct a detailed analysis of LAD's Stage II (Search), named LAD-Search. It shows significant improvements in Table 1, with GPT-4o-mini scores increasing from $68 \%$ to $74 \%$ (English) and $44 \%$ to $52 \%$ (Chinese) in the MCQ, and from 3.84 to 4.02 (English) and 3.58 to 3.66 (Chinese) in the OSQ.  
+
+Compared with Grok-3-search [30], GPT-4o-mini-search-preview, and GPT-4o with Perplexity.ai (Pro version), the results are shown in Table 3. GPT-Search, when applied to GPT-4o-mini, improves MCQ scores but degrades OSQ performance (English OSQ: 3.84 to 3.62, Chinese OSQ: 3.58 to 3.34). Grok-Search, on the Grok-3 model, provides limited gains, mainly in English MCQ( $66 \%$ to $72 \%$ 1 exhibits inconsistent Chinese performance, and shows minimal OsQ improvement. Perplexity.ai search with GPT-4o significantly boosts MCQ accuracy, but it markedly lowers OSQ scores (English OSQ: 2.94 to 2.88, Chinese OSQ: 3.76 to 3.28). In contrast, LAD-Search consistently enhances performance across both MCQ and the more challenging OSQ. This underscores its superior ability to effectively integrate external knowledge for implication understanding, outperforming other search methods particularly in open-style reasoning scenarios where they often falter.  
+
+<html><body><table><tr><td rowspan="2"> Model</td><td colspan="2">Multiple-Choice Question</td><td colspan="2">Open-Style Question</td></tr><tr><td>en</td><td>zh</td><td>en</td><td>zh</td></tr><tr><td colspan="5">Grok-3</td></tr><tr><td>w/o search</td><td>66%</td><td>64%</td><td>3.24</td><td>2.96</td></tr><tr><td>Grok-Search</td><td>72% </td><td>64%</td><td>3.25 </td><td>2.92 </td></tr><tr><td colspan="5">GPT-40</td></tr><tr><td>w/o search</td><td>74%</td><td>58%</td><td>2.94</td><td>3.76</td></tr><tr><td>Perplexity (pro)</td><td>80% </td><td>66% </td><td>2.88 </td><td>3.28 </td></tr><tr><td colspan="5">GPT-4o-mini</td></tr><tr><td>w/o search</td><td>68%</td><td>44%</td><td>3.84</td><td>3.58</td></tr><tr><td>GPT-Search</td><td>72% </td><td>48% </td><td>3.62 </td><td>3.34 </td></tr><tr><td>LAD-Search</td><td>74% </td><td>52% </td><td>4.02 </td><td>3.66 </td></tr></table></body></html>
+
+Table 3: Results of different search methods. Our LAD-Search method achieves the best improvement. The best-improvement method in each category is in-bold.  
+
+# 5 Discussion  
+
+# 5.1How to Let Androids Dream? Perception and Reasoning  
+
+The question \*How to Let Androids Dream?" metaphorically addresses the foundational challenge of enabling AI systems to interpret the nuanced implications embedded in images. Our framework tackles this by first emulating human-like perception (Stage I), converting raw visual input into rich, multi-level textual representations, including comprehensive descriptions and salient keywords. These keywords are designed to capture not only objects and scenes but also potential emotional tones, relevant domains (e.g., cultural, social, political), and discernible rhetorical devices. Subsequently, LAD's Stage II employs an explicit, structured CoT process. This structured reasoning guides the model to systematically connect the perceived visual elements with retrieved contextual knowledge, thereby constructing a coherent understanding of implications. This method is vital because, as our experiments (Section 4) and recent work on social reasoning [10] show, comprehending implications extends beyond basic VQA tasks and classic logical reasoning; it inherently involves sophisticated social reasoning and the interpretation of contextual cues often missed by MLLMs.  
+
+# 5.2How to Dream of Electric Sheep? Search  
+
+Building upon the capacity to analyze, "How to Dream of Electric Sheep?" delves into how AI can generate accurate and specific image implications--the metaphorical 'electric sheep'. LAD's Stage II (Search) is the key to achieving this goal. This stage acknowledges that the meaning of visual elements, particularly in metaphorical contexts, often relies on external information, such as cultural norms, historical events, or contemporary affairs, which may not be adequately represented in MLLMs' static pre-trained knowledge. LAD's adaptive search mechanism, which includes formulating targeted queries from keywords and dynamically selecting between internal ModelSearch and external WebSearch via Self-Judge, systematically enriches the initial perception with relevant cross-domain knowledge. This iterative retrieval and integration of contextual information, especially for popular metaphors or ambiguous visual cues, significantly broadens the model's interpretive horizon. By providing this essential external context, the Search stage empowers LAD to move beyond superficial interpretations and accurately capture the intended, often subtle, implications of an image, as demonstrated by its robust performance on Open-Style Question (OSQ).  
+
+# 6 Conclusion  
+
+Understanding image implications remains challenging for MLLMs, mainly due to missing contextual information. Our work introduces LAD, a novel three-stage framework--Perception, Search, and Reasoning. Inspired by human cognitive processes, this framework is designed to achieve contextual alignment by explicitly integrating visual interpretation with external knowledge retrieval. We conduct comprehensive experiments to demonstrate its effectiveness. Utilizing the lightweight GPT-4o-mini, LAD achieves SOTA results on English and Chinese implication benchmarks, performing comparable or even surpassing GPT-4o and other top closed-source models, particularly on challenging Open. Style Question. In summary, LAD bridges the gap between superficial perception and deep reasoning in multimodal AI systems, offering a promising direction for context-aware reasoning.  
+
+# Limitation and Future Work  
+
+While our work represents a huge step towards image implication tasks, the LAD framework still suffers from the following limitations:  
+
+1) The search stage, particularly the websearch and multiple model calls, will make latency in generating image implications.  
+
+2) Furthermore, although our Open-Style Question (OSQ) evaluation incorporates average multiple model calls and human consistency checks (the human-model scoring consistency reached $9 5 . 7 \%$ with $1 6 \mathrm { P h D }$ students and researchers) to mitigate subjectivity, its foundation on the GPT-4o model judgments may still retain a degree of inherent bias.  
+
+In future work, we aim to prioritize optimizing the search strategy to enhance efficiency and reduce model calls without compromising performance, alongside further refining our evaluation method.  
+
+# Ethics Statement  
+
+The LAD framework aims to enhance AI's nuanced understanding of image implications, a crucial aspect of human-like cognition. We acknowledge that advanced interpretative capabilities carry ethical considerations, including potential biases inherited from underlying MLLMs or training data, and the risk of misuse in generating or interpreting content. Our use of public benchmarks promotes transparency in evaluation. We are committed to fostering responsible development and encourage continued research into robust safeguards and ethical AI practices within multimodal reasoning to ensure beneficial applications.  
+
+# References  
+
+[1] Anthropic. Model card addendum: Claude 3.5 haiku and upgraded claude 3.5 sonnet, 2024.   
+[2] S. Bai, K. Chen, X. Liu, J. Wang, W. Ge, S. Song, K. Dang, P. Wang, S. Wang, J. Tang, H. Zhong, et al. Qwen2.5-v1 technical report. arXiv preprint arXiv:2502.13923, 2025.   
+[3] Z. Chen, K. Liu, Q. Wang, J. Liu, W. Zhang, K. Chen, and F. Zhao. Mindsearch: Mimicking human minds elicits deep ai searcher. arXiv preprint arXiv:2407.20183, 2024.   
+[4] DeepSeek-AI et al. Deepseek-r1: Incentivizing reasoning capability in llms via reinforcement learning. arXiv preprint arXiv:2501.12948, 2025.   
+[5] P. Desai, T. Chakraborty, and M. S. Akhtar. Nice perfume. how long did you marinate in it? multimodal sarcasm explanation. In AAAI, 2022.   
+[6] J. Hessel, A. Marasovic, J. D. Hwang, L. Lee, J. Da, R. Zellers, R. Mankoff, and Y. Choi. Do androids laugh at electric sheep? humor "understanding" benchmarks from the new yorker caption contest. In ACL, 2023.   
+[7] Z. Horvitz, J. Chen, R. Aditya, H. Srivastava, R. West, Z. Yu, and K. McKeown. Getting serious about humor: Crafting humor datasets with unfunny large language models. In ACL, 2024.   
+[8] Y. Hu, W. Shi, X. Fu, D. Roth, M. Ostendorf, L. Zettlemoyer, N. A. Smith, and R. Krishna. Visual sketchpad: Sketching as a visual chain of thought for multimodal language models. arXiv preprint arXiv:2406.09403, 2024.   
+[9] N. Jain, K. Han, A. Gu, W.-D. Li, F. Yan, T. Zhang, S. Wang, A. Solar-Lezama, K. Sen, and I. Stoica. Livecodebench: Holistic and contamination free evaluation of large language models for code. arXiv preprint arXiv:2403.07974, 2024.   
+[10] H. Kim, M. Sclar, T. Zhi-Xuan, L. Ying, S. Levine, Y. Liu, J. B. Tenenbaum, and Y. Choi. Hypothesis-driven theory-of-mind reasoning for large language models. arXiv preprint arXiv:2502.11881, 2025.   
+[11] G. Lakoff and M. Johnson. Metaphors we live by. University of Chicago press, 2008.   
+[12] W. Li, L. Li, T. Xiang, X. Liu, W. Deng, and N. Garcia. Can multiple-choice questions really be useful in detecting the abilities of llms? arXiv preprint arXiv:2403.17752, 2024.   
+[13] Z. Li, R. Luo, J. Zhang, M. Qiu, and Z. Wei. Vocot: Unleashing visually grounded multi-step reasoning in large multi-modal models. arXiv preprint arXiv:2405.16919, 2024.   
+[14] H. Lightman, V. Kosaraju, Y. Burda, H. Edwards, B. Baker, T. Lee, J. Leike, J. Schulman, I. Sutskever, and K. Cobbe. Let's verify step by step. arXiv preprint arXiv:2305.20050, 2023.   
+[15] Z. Liu, F. Fang, X. Feng, X. Du, C. Zhang, et al. Ii-bench: An image implication understanding benchmark for multimodal large language models. In NeurIPS, 2024.   
+[16] P. Lu, H. Bansal, T. Xia, J. Liu, C. Li, H. Hajishirzi, H. Cheng, K.-W. Chang, M. Galley, and J. Gao. Mathvista: Evaluating mathematical reasoning of foundation models in visual contexts. In ICLR, 2024.   
+[17] S. Menon, R. Zemel, and C. Vondrick. Whiteboard-of-thought: Thinking step-by-step across modalities. arXiv, 2024.   
+[18] A. Myrzakhan, S. M. Bsharat, and Z. Shen. Open-llm-leaderboard: From multi-choice to open-style questions for llms evaluation, benchmark, and arena. arXiv preprint arXiv:2406.07545, 2024.   
+[19] OpenAI. Gpt-4o system card. arXiv preprint arXiv:2410.21276, 2024.   
+[20] OpenAI. Learning to reason with llms, 2024.   
+[21] B. Seed. Doubao-1.5-thinking-vision-pro, 2025.   
+[22] G. Team. Gemini: A family of highly capable multimodal models. arXiv preprint arXiv:2312.11805, 2023.   
+[23] K. Team, A. Du, B. Gao, B. Xing, C. Jiang, C. Chen, C. Li, C. Xiao, C. Du, C. Liao, et al. Kimi k1.5: Scaling reinforcement learning with llms. arXiv preprint arXiv:2501.12599, 2025.   
+[24] Q. Team. Qvq: To see the world with wisdom, 2024.   
+[25] Q. Team. Qwq: Reflect deeply on the boundaries of the unknown, 2024.   
+[26] K. Wang, J. Pan, W. Shi, Z. Lu, M. Zhan, and H. Li. Measuring multimodal mathematical reasoning with math-vision dataset. In NeurIPs, 2024.   
+[27] P. Wang, S. Bai, S. Tan, S. Wang, Z. Fan, J. Bai, K. Chen, X. Liu, J. Wang, W. Ge, Y. Fan, K. Dang, M. Du. X. Ren, R. Men, D. Liu, C. Zhou, J. Zhou, and J. Lin. Qwen2-vl: Enhancing vision-language model's perception of the world at any resolution. arXiv preprint arXiv:2409.12191, 2024.   
+[28] P. Wu and S. Xie. V\*: Guided visual search as a core mechanism in multimodal llms. arXiv preprint arXiv:2312.14135, 2023.   
+[29] Z. Wu, X. Chen, Z. Pan, X. Liu, W. Liu, D. Dai, H. Gao, Y. Ma, C. Wu, B. Wang, et al. Deepseekv12: Mixture-of-experts vision-language models for advanced multimodal understanding. arXiv preprint arXiv:2412.10302, 2024.   
+[30] xAI. Grok 3 beta -- the age of reasoning agents, 2025.   
+[31] G. Xu, P. Jin, H. Li, Y. Song, L. Sun, and L. Yuan. Llava-cot: Let vision language models reason step-by-step. arXiv preprint arXiv:2411.10440, 2024.   
+[32] Y. Xu, Y. Hua, S. Li, and Z. Wang. Exploring chain-of-thought for multi-modal metaphor detection. In ACL, 2024.   
+[33] A. Yang, B. Yang, B. Hui, B. Zheng, B. Yu, C. Zhou, C. Li, C. Li, D. Liu, F. Huang, G. Dong, H. Wei, H. Lin, J. Tang, J. Wang, J. Yang, J. Tu, J. Zhang, J. Ma, J. Xu, J. Zhou, J. Bai, et al. Qwen2 technical report. arXiv preprint arXiv:2407.10671, 2024.   
+[34] Y. Yang, Z. Li, Q. Dong, H. Xia, and Z. Sui. Can large multimodal models uncover deep semantics behind images? In ACL, 2024.   
+[35] H. Yao, J. Huang, W. Wu, J. Zhang, Y. Wang, S. Liu, Y. Wang, Y. Song, H. Feng, L. Shen, and D. Tao. Mulberry: Empowering mllm with o1-like reasoning and reflection via collective monte carlo tree search. arXiv preprint arXiv:2412.18319, 2024.   
+[36] X. Yue, Y. Ni, K. Zhang, T. Zheng, R. Liu, G. Zhang, S. Stevens, D. Jiang, W. Ren, Y. Sun, C. Wei, B. Yu, R. Yuan, R. Sun, M. Yin, B. Zheng, Z. Yang, Y. Liu, W. Huang, H. Sun, Y. Su, and W. Chen. Mmmu: A massive multi-discipline multimodal understanding and reasoning benchmark for expert agi. In CVPR, 2024.   
+[37] C. Zhang, X. Feng, Y. Bai, X. Du, et al. Can mllms understand the deep implication behind chinese images? arXiv preprint arXiv:2410.13854, 2024.   
+[38] C. Zheng, H. Zhou, F. Meng, J. Zhou, and M. Huang. Large language models are not robust multiple choice selectors. In ICLR, 2024.   
+[39] Zhipu.ai. Glm-4v, 2024.   
+[40] S. Zhong, Z. Huang, S. Gao, W. Wen, L. Lin, M. Zitnik, and P. Zhou. Let's think outside the box: Exploring leap-of-thought in large language models with creative humor generation. arXiv preprint arXiv:2312.02439, 2024.  
+
+# A Algorithm  
+
+#  
+
+<html><body><table><tr><td></td><td>Algorithm 1: Let Androids Dream (LAD))</td></tr><tr><td>Input: Image IMG, Task TMcQ, Task Tosq Output: Answer AmcQ, Answer Aosq</td><td></td></tr><tr><td></td><td>// Stage I: Perception /* Gen. description. */</td></tr><tr><td></td><td>1 img_dep  MLLM.Perception(IMG)</td></tr><tr><td></td><td>2 keywords  MLLM.Perception(img_dep) // Stage II: Search</td></tr><tr><td></td><td>3 search_qs  MLLM.Plan(keywords) /* 5 questions for image implication */.</td></tr><tr><td>4 all_qa<0</td><td>5 for each q in search_qs do</td></tr><tr><td>6</td><td>strategy  MLLM.Self-Judge(q)</td></tr><tr><td>7</td><td>if strategy = WebSearch' then /* External knowledge */</td></tr><tr><td>8</td><td>answer  WebSearch(q)</td></tr><tr><td>9</td><td>end</td></tr><tr><td>10</td><td>else if strategy = ModelSearch' then</td></tr><tr><td>11 12</td><td>| answer  ModelSearch(q) /* Parametric knowledge */ end</td></tr><tr><td>13</td><td>all_qa.add((q, answer))</td></tr><tr><td>14 end</td><td>15 search_sum  MLLM.Summary(img_dep, all_qa)</td></tr><tr><td></td><td>/* Rank top-3, refine */ // Stage III: Reasoning</td></tr><tr><td></td><td>16 AmcQ  MLLM.Reasoning(IMG, img_dep, keywords, search_sum,TMcQ) /* Explicit CoT */</td></tr><tr><td></td><td>17 AosQ  MLLM.Reasoning(IMG,img_dep,keywords, search_sum, Tosq) /* Explicit CoT */</td></tr><tr><td></td><td>18 return AmcQ, Aosq</td></tr><tr><td></td><td></td></tr><tr><td></td><td>19 Function WebSearch(q) // Planner: Decompose query</td></tr><tr><td>20</td><td>sub_qs  MLLM.RewriteQuery(q)</td></tr><tr><td></td><td>// Searcher: Hierarchical retrieval</td></tr><tr><td>21</td><td>snippets  SearchAPI.BatchQuery(sub_qs) /* Titles, summaries, URLs */</td></tr><tr><td>22</td><td>sel_urls  MLLM.SelectPages(snippets, q)</td></tr><tr><td>23</td><td></td></tr><tr><td></td><td>content  PythonCrawler.FetchContent(sel_urls)</td></tr><tr><td></td><td>// Summarizer: Generate answer</td></tr><tr><td></td><td></td></tr><tr><td>24</td><td></td></tr><tr><td></td><td>summary  MLLM.Summary(content, q)</td></tr><tr><td></td><td></td></tr><tr><td></td><td></td></tr><tr><td></td><td></td></tr><tr><td>25</td><td></td></tr><tr><td></td><td>return summary</td></tr><tr><td></td><td></td></tr><tr><td></td><td></td></tr></table></body></html>  
+
+# B Experiment Setup  
+
+We use the lightweight GPT-4o-mini-0718 [19] with LAD framework in experiments. We set the model temperature as 0.5 and top_p as 0.9 in MCQ experiments, and temperature as 0.7 and top_p as 0.9 in OSQ experiments. Additionally, we set the evaluation model GPT-4o temperature as 0 and evaluate more than three times to get the average score in OSQ experiments. All experiments are conducted on NVIDIA A800 GPUs.  
+
+# C Human-Model Consistency Study  
+
+To validate our automated OSQ evaluation based on the GPT-4o model, we conduct a human-model consistency study. We construct a dedicated dataset by randomly selecting 25 images with questions each from our English and Chinese OSQ. We recruit $1 6 \mathrm { P h D }$ students and researchers, all proficient in both English and Chinese and experienced with metaphorical imagery, to independently score the model responses. Their evaluations are based on ground truth answers and detailed scoring standard. We calculate human inter-annotator agreement by averaging the scores for each response after discarding the highest and lowest individual scores. This process yields the consistency of $9 4 . 8 \%$ for Chinese and $9 6 . 5 \%$ for English. The average human-model scoring consistency reached $9 5 . 7 \%$ , affirming the method's validity for assessing image implication comprehension.  
+
+# D Prompts  
+
+In experiments, the prompts of different settings are as follows:  
+
+# D.1 Evaluation  
+
+# # Role  
+
+You are an impartial judge who is familiar with Intenet culture and memes, and is good at digging out and analyzing the deep meaning of Internet memes.  
+
+# # Attention  
+
+You are responsible for evaluating the quality of the answer provided by the model for Intenet culture and memes. Your evaluation should refer to the human answer and image, and score based on the Evaluation Standard.  
+
+# ## Evaluation Standard  
+
+# - [1 point]:  
+
+Fails to capture k elemnts wthin th mag (sch as text, and mortant tities). Dos not idfy tions, omain, or rhricl devie. Only provides a superficial desription of surface-level infomation, lacking depth and cretivity, with asgnificant gap from the standard answer.  
+
+# - [2 points]:  
+
+Captures some key elements within the image, but th dentification of emotions, domain, and rhtorical devices is vague. The decription of surface-level infomation is relatively complete, but thee is aclr deficiency in exploring deer meanings, showng  noticeable gap from the standard answer.  
+
+# - [3 points]:  
+
+Effectively catres key elments within the image and intilly identifies otions, domain, and horical dvices.The derition of surface-eel ifomation is rlatiely accrte, and thee is some releant expession of e menngs. Howver, there i stil room for improvement in depth and creativity, and it is generally close to the standard answer.  
+
+# - [4 points]:  
+
+Accurately captres ky eements withn the age and cleary identifies otions, dmain, and hrical devices. The derition of sufae level infomatio is dtied and prcise, with  tiely deep expration f de mngs, dmonstting a crtin lel f ctivt and depth. It is largely consistent with the standard answer but may have minor deficiencies in some details or depth.  
+
+# - [5 points]:  
+
+Accurately and precisely captures key elements within the image and profoundly identifies emotions, domain, and rhetorical devices. Th description of surface-level infomationi comprhensive and precise, with unique insights into deep mening, skilfully inteating imag elements wth metaphorical implications. It demonstrates exceptional cretivity and depth, i highly consistent with the tandard answer and shows a profound grasp of metaphor creation and cultural understanding.  
+
+# ## Standrad Answer:  
+
+Human answer: {  
+
+# ## Constraints  
+
+![](images/001743ef137cf690733dd6501951fbbed3d2140dd5d41a5faef345170851da3f.jpg)  
+Figure 5: The evaluation prompt of Open-Style Question (OsQ).  
+
+# D.2 End2End  
+
+![](images/3327356e6b244b99075d22431f884874e71f93336b7de92114e2cbe87d5255a3.jpg)  
+Figure 6: The end2end prompt of Multiple-Choice Question (MCQ)  
+
+![](images/0b146f39779fba352145b952b020ded226978a170a18cb84f64835b8d86c558e.jpg)  
+Figure 7: The end2end prompt of Open-Style Question (OSQ).  
+
+# D.3 CoT  
+
+![](images/08029342d2c826ee0ec5bd2179c3336b0a3383e5df56fdd5bfad893bc6b30de7.jpg)  
+Figure 8: The CoT prompt of Multiple-Choice Question (MCQ).  
+
+![](images/77c61f3d0ff82096559fd1dfa745074d7a7f109553a17eeabbaff3793b1c640b.jpg)  
+
+Figure 9: The CoT prompt of Open-Style Question (OSQ).  

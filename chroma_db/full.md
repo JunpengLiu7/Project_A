@@ -1,0 +1,352 @@
+# COMPACT: COMPositional Atomic-to-Complex Visual Capability Tuning  
+
+Xindi Wul\* Hee Seung Hwang1\* Polina Kirichenko2 Olga Russakovsky1  
+
+1 Princeton University 2Meta AI https://princetonvisualai.github.io/compact/  
+
+# Abstract  
+
+Multimodal Large Language Models (MLLMs) excel at simple vision-language tasks but struggle when faced with complex tasks that require multiple capabilities, such as simultaneously recognizing objects, counting them, and understanding their spatial relationships. This might be partially the result of the fact that Visual Instruction Tuning (VIT), a critical training step for MLLMs, has traditionally focused on scaling data volume, but not the compositional complexity of training examples. We propose COMPACT (COMPositional Atomic-to-complex Visual Capability Tuning), which generates a training dataset explicitly controlling for the compositional complexity of the training examples. The data from COMPACT allows MLLMs to train on combinations of atomic capabilities to learn complex capabilities more efficiently. Across all benchmarks, COMPACT achieves comparable performance to the LLAVA-665K VIT while using less than $10\%$ of its data budget, and even outperforms it on several, especially those involving complex multi-capability tasks. For example, COMPACT achieves substantial $83.3\%$ improvement on MMStar and $94.0\%$ improvement on MM-Vet compared to the full-scale VIT on particularly complex questions that require four or more atomic capabilities. COMPACT offers a scalable, data-efficient, visual compositional tuning recipe to improve on complex visual-language tasks.  
+
+# 1. Introduction  
+
+Multimodal Large Language Models (MLLMs) have shown impressive progress in handling a wide range of visionlanguage tasks [1, 2, 19].  Yet, from early diagnostic works [30, 32] to recent state-of-the-art models like LLaVA [22, 23], Cambrian [37], and Eagle [21, 34], the compositionality challenge remains persistent. Consider the following question: "Are there more blue squares or red circles on the image?' A model that is capable of recognizing shapes, colors and counting objects should be able to answer it correctly. Despite years of progress, state-of-the-art models still fail on such compositional questions, even though they can answer simpler ones correctly (e.g. "What color is the square?). This has been a long-standing issue and such failures suggest that current models do not systematically generalize to tasks with higher compositional complexity.  
+
+![](images/cbedacac0486d47d83ae331211d299acef99810b9080baeebde2333a2b47516d.jpg)  
+Figure 1. Compositional Complexity Comparison. Comparison between visual instruction tuning data (LLAVA-665K [24] VIT) and our compositional tuning data (COMPACT). The VIT data is dominated by simple queries $\begin{array}{r}{\left(k=1\right)}\end{array}$ , while our COMPACT data is balanced across compositional complexity levels $\mathit{\check{k}}=1,2,3$ 1  
+
+To address this, recent efforts have primarily scaled up the amount of training data used for Visual Instruction Tuning (VIT) [21, 24, 25, 34, 37], an essential but data- and compute-heavy step for MLLM training. However, such datasets (e.g. LLAVA-665K [24]) are dominated by simple queries that require only one capability, lacking sufficient compositional complexity (Fig. 1). Even with large-scale instruction tuning, recent studies show that models still struggle with integrating capabilities and generalizing to complex visual tasks due to limitations in the compositional complexity of their training data [29, 40]. Thus, we ask: Can we bridge the performance gap between different complexity regimes without simply increasing the data volume?  
+
+Instead of treating compositionality as a byproduct of scale, we encourage compositional capabilities in MLLMs with hierarchically structured compositional training data. In this work, we introduce COMPACT (COMPositional  
+
+Atomic-to-complex Visual Capability Tuning), a data recipe that scales capabilities of MLLMs from atomic $\left(k=1\right)$ ) to composite $(k>1)$ complexity levels. We define a set of 10 atomic capabilities and then combine them to generate a compositional training dataset that can promote model's internalization of the compositional structures of complex tasks in a compute-efficient manner. We summarize our key contributions:  
+
+: We introduce COMPACT, a visual compositional tuning data recipe that builds complex capabilities from simple atomic capabilities. By systematically combining 10 atomic capabilities to control the complexity of training samples, COMPACT addresses a key limitation of conventional VIT methods that rely on incidental capability composition through data scaling. : We develop a structured data recipe that enforces a balanced distribution across different levels of compositional complexity $(k=1,2,3$ to cover a wider range of task regimes. This approach flattens the complexity cliff in conventional VIT datasets [24], where $90.1\%$ of the questions require two or fewer capabilities. . We demonstrate the impressive effectiveness of COMPACT. With only $10\%$ of the size of the VIT dataset ( $5\%$ of the LLAVA-665K [24] VIT data augmented with 32K samples of our compositional tuning data), training with COMPACT matches the performance of full-scale VIT $(100.18\%$ relative score). Further, it demonstrates exceptional generalization to higher-complexity tasks, improving the score from 35.3 to 64.7 on MMStar [6] and from 32.5 to 57.5 on MMVet [43] for $k=4$ tasks.  
+
+leverages the learning potential of both compositional tuning and instruction tuning data to create a more optimal data recipe than conventional VIT.  
+
+Compositionality in LLMs and MLLMs.  Semantically, compositionality is the claim that the meaning of a complex statement is a result of the combination of its constituents. [8]. In the context of visual capabilities of MLLMs, compositional capability refers to a model's ability to perform complex tasks by combining multiple capabilities [13], where each capability is related to understanding basic visual concepts such as objects, attributes, relationships. Recent work has shown that compositional capability can be trained in LLMs [42, 45], but generalizations to the realms of MLLMs have been largely incomplete. Some studies highlight that while MLLMs do show signs of compositional capability [28], they struggle when constituting components and their combined patterns are not strongly learned or missing during training [4]. Furthermore, previous works have focused on limited domains such as geometry [5], visual recognition, and language [7], or employed a relaxed definition of compositionality as a sequential array of tasks [20] rather than integrating them.  
+
+Studies show that general visual capability requires strong compositional ability [44]. In order to train MLLMs to learn complex capabilities, it is necessary to explicitly model compositionality in the training data. Our approach takes advantage of these findings to create a data recipe for training complex capabilities across visual domains.  
+
+# 2. Related Work  
+
+Visual Instruction Tuning. Instruction following is an essential capability in language models [38, 46]. Misalignment between a model's response and the format requested by a question can hinder the precise evaluation of its performance and capabilities [3, 11, 12, 31]. In order to adapt MLLMs to respond appropriately to diverse question formats (e.g., multiple-choice, short- and long-response questions), Visual instruction tuning [22, 24] has been proposed. VIT involves training a model on a fixed set of instruction patterns that can be repeated during inference. Although VIT has shown performance improvements in general multimodal capabilities [14], recent work [10] has shown that optimizing for response formatting potentially limits the quality of language model responses.  
+
+While VIT [24] focuses on learning simple capabilities via instruction following, our data recipe explicitly models compositional capabilities in the training data. Our approach directly addresses the lack of exposure to compositional questions during training, enabling models to improve on tasks that are more complex in capability space. COMPACT  
+
+Data Efficiency in MLLMs. VIT is a data and computeheavy step in training [41]. Studies have found that the performance of MLLMs can be reproduced with less data and better techniques, suggesting that the amount of data needed for VIT can be reduced. For example, recent works have developed effective VIT data recipes by leveraging data selection methods and curating higher-quality training datasets [16, 26]. ICONS [39] shows that models can achieve near-perfect performance across a suite of MLLM benchmarks with a fraction of the original VIT dataset. On the other hand, some studies proposed an alternative approach of scaling up to improve visual capabilities even further [18].  
+
+However, these approaches treat compositionality as a byproduct of scale rather than as a learnable capability. Our COMPACT formalizes atomic capabilities and systematically incorporates their combinations into the training dataset to efficiently address the limitations in generalization to complex compositional tasks. By redistributing the compositional complexity of the training data, we scale the model's exposure to complex tasks without scaling the data.  
+
+![](images/b894009ffcd1f56b0bdc377a7713fb642bea9d7e974d682848a84f8b1e918f3e.jpg)  
+Figure 2. COMPACT's Data Generation Pipeline. $(L e f t)$ : We sample $k\in\{1,2,3\}$ atomic capabilities such as color, object recognition, and spatial relationship. (Center): We generate questions that integrate all $k$ sampled capabilities. (Right): We verify the quality of generated converations and combine them with instruction tuning data to maintain instruction following capability. This structured data recipe explicitly models atomic-to-complex learning procedure, in contrast to standard LLAVA-665K [24]VIT that promotes learning from simple queries.  
+
+# 3. Method  
+
+We propose COMPACT (Fig. 2), a data recipe that scales capabilities of MLLMs from atomic $(k=1)$ to composite $\begin{array}{r}{\left(k>1\right)}\end{array}$ complexity levels. We first introduce the concept of atomic visual capabilities (\$3.1), which serve as the foundational building blocks of complex visual tasks. We then detail COMPACT's four-step data recipe (\$3.2) for generating high-quality compositional training data that allows models to integrate multiple visual capabilities.  
+
+# 3.1. Atomic Visual Capabilities  
+
+Atomic capabilities are foundational skills that can be combined to solve complex tasks. For example, a model needs to acquire object recognition, color attribution, and spatial relationship understanding capabilities to identify how objects of different colors are spatially oriented. For each task $T$ , we identify a set of atomic visual capabilities $\{c_{1},\ldots.c_{k}\}$ required to solve this task. We define the number of atomic capabilities required to solve the task $T$ as its compositional complexity $k$ . Our goal in COMPACT is to increase the average compositional complexity of the dataset and balance its distribution among the samples so that each question explicitly requires the model to combine multiple atomic capabilities during training.  
+
+We build a taxonomy of atomic capabilities from the existing literature on MLLMs and their general visual reasoning skills [15, 40]. Extremely low-frequency and nonperceptual capabilities (e.g. cultural knowledge, historical context, and math) are removed, resulting in 10 fine-grained atomic capabilities (Tab. 1) that focus on visual understanding. We categorize these atomic capabilities into three major categories: 1) Attribution: identifying visual properties of objects (e.g., color and shape). 2) Recognition: detecting and interpreting visual entities, including objects, actions, text, spatial recognition, and counts. 3) Relation: capturing how entities interact or relate to one another from an abstract or a physical perspective, either through spatial relationship, object interaction, or scene understanding.  
+
+# 3.2. Visual Compositional Tuning Data Recipe  
+
+In our proposed approach COMPACT, we generate multicapability questions $\mathcal{D}_{\mathrm{comp}}$ by prompting vision-language models to create questions that require natural' integration of exactly $k$ atomic visual capabilities. This process involves four key steps: (1) randomly selecting $k$ capabilities from our predefined set of atomic visual capabilities (Capability Sampling), (2) prompting Gemini-2.0-Flash [36] to generate questions that naturally integrate all $k$ selected capabilities (Conversation Generation), (3) validating the capability requirement and the quality of each question through an independent verification step (Quality Verification), and (4) combining our generated compositional tuning data with a small portion of the LLAVA-665K [24] VIT data to assemble the final dataset (Dataset Assembly).  
+
+Step 1: Capability Sampling. We start by taking a random sample of images from LLAVA-665K [24]. For each image, we repeatedly sample $k\in\{1,2,3\}$ capabilities from our predefined pool of 10 atomic visual capabilities. In order to include diverse combinations of atomic capabilities in our training dataset, we do the following in each round of capability sampling: (a) prioritize the capabilities that have not been selected for that image, and (b) drop duplicate combinations of capabilities for the same image. These efforts ensure that our training examples efficiently capture the visual information in the images.  
+
+Table 1. Taxonomy of Atomic Capabilities. We identify 10 atomic capablities and categorize them into thee groups: Atribution, Recognition, and Relation. Atomic capabilities serve as building blocks for compositional instruction tuning. For each capability, we provide the definition and a question example that requires the capability to answer.   
+
+
+<html><body><table><tr><td>Group</td><td>Capability</td><td>Definition</td><td>Example Question</td></tr><tr><td rowspan="2">Attribution</td><td>Color</td><td>Identifying or comparing colors of objects in the image</td><td>What color is the car?</td></tr><tr><td>Shape</td><td>Recognizing and describing the shapes of objects in the image</td><td>What shape is the dining table?</td></tr><tr><td rowspan="6">Recognition</td><td>Object Recognition</td><td> Identifying and naming objects present in the image</td><td>What object is on the table?</td></tr><tr><td>Action Recognition</td><td>Identifying what action is being performed</td><td>What is the person doing in this image?</td></tr><tr><td>Text Recognition</td><td>Reading and interpreting text visible in the image</td><td>What word is written on the sign?</td></tr><tr><td>Spatial Recognition</td><td>Understanding the overall spatial layout and arrangement of the entire scene</td><td>How is the furniture arranged in this room?</td></tr><tr><td>Counting</td><td>Determining the number of instances of something in the image</td><td></td></tr><tr><td></td><td></td><td>How many people are in the room?</td></tr><tr><td rowspan="3">Relation</td><td> Spatial Relationship</td><td>Identifying how specific objects are positioned relative to each other</td><td>What is next to the red car?</td></tr><tr><td>Object Interaction</td><td>Analyzing how multiple objects interact with each other </td><td>How is the woman interacting with the laptop?</td></tr><tr><td>Scene Understanding</td><td>Identifying the type of environment/setting</td><td>Where is this scene taking place?</td></tr></table></body></html>  
+
+Step 2: Conversation Generation. For each capability combination that is sampled, we prompt Gemini-2.0- Flash [36] to generate a conversational question-answer pair that integrates all capabilities in the combination, as well as a score between 0 and 100 that represents its confidence in the quality of the conversation. Our carefully designed prompt (see Appendix $\S_{\mathrm{B}}$ ) enforces several key constraints: (a) questions must require the use of visual information from the image and cannot be answered from its text alone, (b) answers must be concise, (c) questions must integrate exactly the specified capabilities naturally (without using conjunctions to simply conjoin single-capability questions), and (d) questions must reference objects and features actually present in the image. The purpose of these constraints is to produce vision-centric conversations that are unambiguous and natural. The format of the generated output adheres to a JSON template that explicitly tags the required capabilities for each question.  
+
+Step 3: Quality Verification.We include a verification process with Gemini-2.0-Flash [36] to ensure the quality and diversity of the training dataset. We filter out questions with uninformative answers (e.g., "unknown", "not visible") or those with confidence scores below $70\%$ . We discard questions that share more than $60\%$ of the words with those previously accepted. Additionally, we reject visually ungrounded questions whose answers can be inferred from the question alone.  
+
+Then, we perform capability verification by prompting Gemini-2.0-Flash [36] to analyze whether each question indeed requires exactly the $k$ specified capabilities. Questions that require unspecified capabilities or do not utilize all $k$ capabilities are rejected. The generation and verification processes in steps 2 and 3 repeat iteratively until we collect 2-3 high-quality conversations per $k$ for each image or reach a maximum of 10 verification attempts. Only images with at least two verified questions are included in the final dataset.  
+
+Step 4:  Dataset Assembly. The final training dataset combines two components: (1) a random $5\%$ subset of the LLAVA-665K [24] VIT dataset, and (2) our COMPACTgenerated compositional tuning data. The compositional tuning data consists of compositional multiturn conversations and their corresponding images randomly sampled from the VIT dataset. This mixture of instruction tuning and compositional tuning data serves a dual purpose. First, the VIT subset maintains the model's ability to handle diverse response formats and instructions required by modern MLLM benchmarks (e.g., multiple-choice questions [9], open-ended answers [24]). Second, our compositional data trains the model's capability to reason about multiple visual aspects within a single complex question. In this way, we delegate the instruction following capability training to the original VIT data and allow our compositional tuning data to focus on developing the model's compositional capabilities.  
+
+COMPACT preserves the contents of the images sampled from LLAVA-665K [24] when generating new multi-turn conversations. This enables us to fairly compare COMPACT and existing methods in their ability to extract rich and structured information from the controlled set of images. We further adjust the ratio of the VIT subset to our compositional tuning data and study how it affects perfor mance (\$4.4). Our findings show the optimal balance between the preservation of instruction following capability and the training of compositional capabilities.  
+
+# 4. Experiments  
+
+In this section, we evaluate the baseline approaches and COMPACT on existing multimodal benchmarks. First, we discuss our evaluation setup and the benchmarks (\$4.1). Second, we compare the performance of COMPACT with relevant baselines, including LLA VA-665K [24] VIT (\$4.2).  
+
+Table 2. Baseline Comparisons. Performance comparison of COMPACT with baselines. With only $5\%$ of the LLAVA-665K [24] VIT data and 32K of our compositional uning data 65K total), COMPACT outperforms the random subset of the VIT data (Random), gradient-based approach selected suset f theVIT data IONs [391), and even the flVIT dat on divere multimodal enchmark. The best and second best results for each benchmark are shown in bold and underlined, respectively. COMPACT integrates atomic capabilitie into tasks of higher compositional complexity, enabling models to generalize and handle complex tasks without explicit decomposition.   
+
+
+<html><body><table><tr><td>Recipe</td><td>#Data</td><td>InfoVQA [27]</td><td>SeedBench2Plus [17]</td><td>MME [9]</td><td>TextVQA [35]</td><td>MM-Vet [43]</td><td>CV-Bench [37]</td><td>MMStar [6]</td><td>LLaVA-W [24]</td><td>Rel. (%)</td></tr><tr><td>LLAVA-665K [24]</td><td>665K</td><td>20.80</td><td>41.72</td><td>1478.48</td><td>46.99</td><td>29.22</td><td>60.92</td><td>35.11</td><td>68.50</td><td>100.00</td></tr><tr><td>Random</td><td>65K</td><td>20.05</td><td>41.85</td><td>1327.70</td><td>42.88</td><td>30.46</td><td>54.71</td><td>34.13</td><td>64.30</td><td>95.38</td></tr><tr><td>ICONS [39]</td><td>65K</td><td>21.0</td><td>42.03</td><td>1402.75</td><td>43.12</td><td>31.23</td><td>55.96</td><td>35.96</td><td>61.8</td><td>97.47</td></tr><tr><td>COMPACT (ours)</td><td>65K</td><td>23.68</td><td>43.13</td><td>1379.94</td><td>44.37</td><td>31.74</td><td>55.28</td><td>36.13</td><td>64.50</td><td>100.18</td></tr></table></body></html>  
+
+Third, we analyze COMPACT trained model's generalization to various levels of compositional complexity and investigate how the distribution of $k$ in the training dataset impacts performance (\$4.3). Finally, we conduct ablation studies to understand different aspects of COMPACT design, such as the distribution of compositional complexities, coverage of atomic capabilities, the range of compositional complexities, and the ratio between instruction and compositional tuning data (\$4.4).  
+
+# 4.1. Evaluation Testbed  
+
+Model. We train LLaVA-v1.5-7B-LoRA [24] model's previsual-instruction-tuning checkpoint2 on our COMPACT training dataset. This checkpoint has not been exposed to any visual instruction tuning data prior to COMPACT training. The training dataset includes 32K-sample compositional tuning data unless otherwise stated. Additionally, we mix $5\%$ of LLAVA-665K [24] to preserve instruction following capability. We train the model for one epoch with its official LLaVA-v1.5 LoRA fine-tuning settings.  
+
+Baselines. We compare the effectiveness of our COMPACT data recipe with several baseline datasets by training models with the same architecture under identical training configurations. LLAVA-665K: The full LLAVA-665K [24] VIT dataset (665K samples) used in LLaVA-v1.5.This serves as our primary performance baseline. Random: A 65K-sample random subset of LLAVA-665K [24] that matches our training data size. This baseline controls for data volume. ICONS [39]: A 65K-sample subset of LLAVA-665K [24] selected using the ICONS method, which is a gradient-driven influence-consensus based data selection method that selects the most informative samples for data-efficient visual instruction tuning.  
+
+Benchmarks. We evaluate models trained with different data recipes on established multimodal benchmarks that assess complex visual capabilities. 1) MM-Vet [43] includes 16 types of complex multimodal tasks integrated from 6 core capabilities (recognition, OCR, knowledge, language generation, spatial awareness, and math). 2) MME [9] contains 10 perception (e.g., color, count, OCR) and 4 cognition (e.g., commonsense reasoning, text translation, code understanding) related visual subtasks. 3) LLaVA-in-the-Wild [24] is an open-ended visual question answering benchmark that asks complex questions on real-world images. 4) SeedBench2Plus [17] evaluates visual comprehension skills of MLLMs with a focus on charts, maps, and webs. 5) MMStar [6] contains 1,500 visual questions that span 6 core capabilities (fine-grained perception, coarse perception, mathematics, science & technology, logical reasoning and instance reasoning), carefully curated to evaluate multimodal understanding. 6) CV-Bench [37] is a MLLM benchmark specialized for 2D and 3D visual understanding that includes spatial relationship, object count, relative distance, and depth order. 7) TextVQA [35] evaluates visual understanding of texts in the image. 8) InfoVQA [27] measures visual understanding of infographic images. These benchmarks cover a broad range of vision-centric capabilities. We also note that some of these benchmarks include non-visual questions involving skills as knowledge and math, which are not our primary focus. We provide a more detailed discussion of model performance in these knowledge-intensive and math-intensive tasks in Appendix $\S\mathrm{A}$  
+
+# 4.2. Main Results  
+
+Overall Performance. As shown in Tab. 2, COMPACT performs on par with the LLA VA-665K [24] baseline. COMPACT's training dataset, which amounts to just $10\%$ of the full VIT data, contains a mixture of 32K generated compositional tuning data and $5\%$ of LLAVA-665K [24] VIT data (33K). The compositional tuning data trains the model on compositional capabilities, and the VIT subset maintains the model's instruction-following capability. COMPACT outperforms both the random [24] and ICONS [39] baselines on most benchmarks, demonstrating superior performance on multi-capability tasks.  
+
+COMPACT shows consistent improvements on different benchmarks, achieving strong gains on tasks like MM-Vet [43] $(+8.6\%$ over LLAVA-665K [24]), MM  
+
+![](images/571f486719295ff672411e555dd52bb5c70b9ebccc128550ee9c90c6d905df34.jpg)  
+Figure 3. Performance Across Compositional Tuning Data Scales. We fix the VIT subset $5\%$ of LLAVA-665K [24]) and scale the compositional tuning data in COMPACT from 2K to 32K. For comparison, we remove the compositional tuning data and ad more VIT data (2K-32K) insted to prare VIT only recipes with qual data budgets. COMPACT (solid lines)consistenly outperforms LLA-665K [24] VIT (dashed lines) with fewer data. The performance gap is pronounced for complex reasoning benchmarks such as MM-Vet and MMStar, where the 8K COMPACT model often exceeds the LLAVA-665K [24] VIT baseline at 32K. This demonstrates the data eficiecy of COMPACT, requiring substantially less data than LLAVA-665K [24] VIT to achieve comparable or better results.  
+
+Star [6] $(+2.9\%)$ ,InfoVQA [27] $(+13.8\%)$ , and SeedBench2Plus [17] $(+3.4\%)$ while maintaining competitive performance on TextVQA [35] and LLaVA-in-theWild [24]. Across all benchmarks, our COMPACT achieves an average relative performance of $100.18\%$ , outperforming even the full LLAVA-665K [24]. In comparison, the random baseline achieves $95.38\%$ , and the ICONS [39] baseline $97.47\%$ , highlighting the effectiveness of our compositional data generation strategy. Additionally, we provide qualitative results in Appendix $\S C$  
+
+Visual Compositional Tuning is Data-Efficient. We study the data efficiency of COMPACT by analyzing how its performance changes as we scale the amount of compositional tuning data. We fix the VIT subset ( $5\%$ of LLAVA665K [24]) and scale the compositional tuning data in COMPACT from 2K to 32K. As comparison, we remove the compositional tuning data and add more VIT data (2K-32K) instead to match the dataset size. Fig. 3 shows that as the number of compositional tuning samples increases, COMPACT performance trends upward across all benchmarks while the random baseline shows mixed behavior as the size of the dataset increases. Furthermore, across all dataset sizes, COMPACT performs consistently better than the random baseline, and the gap increases as the size of the dataset grows. Models trained on smaller compositional tuning data (2K-8K samples) often match or exceed the performance of random baseline models trained on much larger data. For instance, COMPACT's 2K model achieves 30.73 on MMVet [43], outperforming the random baseline's 32K model at 30.46 which has eight times more data. This demonstrates that COMPACT makes more effective use of training data compared to the baselines.  
+
+We hypothesize that this improvement in data efficiency comes from two factors: (1) Balanced Compositional Complexity: COMPACT continuously provides learning signals of higher compositional complexity by balancing the distribution of $k$ in the training dataset. In contrast, the LLAVA665K [24] VIT paradigm trains almost exclusively on $k=1$ tasks (e.g., single-capability queries). Models trained on the VIT data receive signals of higher compositional complexity less frequently, leaving them unprepared for compositional generalization, the ability to integrate combinations of capabilities not explicitly seen during training (more analysis in $\S4.3$ ). (2) Diverse Capability Compositions: COMPACT sustains the learning potential during training by explicitly introducing diverse ( $k>=1\AA$ ) integrations of atomic capabilities. Meanwhile, the LLAVA-665K [24] VIT relies heavily on simpler tasks ( $k=1\mathord{\left/{\vphantom{\left(1\right)\left(k\right)}}\right.\kern-\nulldelimiterspace}$ ) that can be easily memorized and templatized for rapid saturation of learning potential.  
+
+# 4.3. Analysis  
+
+Performance Gains on Complex Compositional Questions. COMPACT's notable performance improvements on complex compositional questions demonstrate its potential for strong compositional generalization. As shown in Fig. 4, COMPACT achieves competitive performance on the MMVet [43] and MMStar [6] benchmarks across various levels of compositional complexity $(k)$ . Despite not being explicitly trained on $k>3$ data, our model effectively generalizes to even higher $k$ regimes. For MM-Vet [43], the scores are 57.5 (COMPACT) vs 32.5 (LLAVA-665K [24]) when $k=4$ A and 20.0 (COMPACT) vs 0.0 (LLAVA-665K [24]) when $k=5$ .For MMStar [6], the scores are 64.7 (COMPACT) vs 35.3 (LLAVA-665K [24]) when $k=4$ .This shows that COMPACT performs robustly in scenarios with higher compositional complexity.  
+
+Distribution of Visual Capabilities. We use Gemini2.0-Flash [36] to analyze each question and identify the atomic capabilities required to give an answer (see the details of the system prompt in Appendix $\S_{\mathrm{B}}$ ). Fig. 10 shows the approximate distribution of the number of capabilities required per question in the LLA VA-665K [24] VIT dataset.  
+
+![](images/9d247a10bf17cf37ca63bdbfa8c27f9f5751bb1a3427113d5ab27a3ad6978e95.jpg)  
+Figure 4. Compositional Generalization to Higher-Complexities. Performance comparison across compositional complexities $(k)$ COMPACT shows competitive performance gainst LAVA-665K [24] VIT traning. It excees the LLAVA-665K [24] baseline at higher compositional complexity tasks ( $k=4$ and $k=5$ ) while using significantly less training data. The $k$ -distribution rows show the distribution of compositional complexities in each benchmark.  
+
+# Example Questions with Different Compositional Complexities  
+
+MM-Vet $\left(k=3\right)$ .   
+Q: What is the color of the hat worn by the person in the front left?   
+Required capabilities: color attribution, object recognition, spatial relationship   
+MMStar $(k=4)$ .   
+Q: What is the position of the red rug in the living room? Required capabilities: color attribution, object recognition, spatial relationship, scene understanding   
+MMStar $(k=5)$ :   
+Q: Is the number of metal cars that are left of the tiny matte school bus greater than the number of tiny cyan double bus?   
+Required capabilities: spatial relationship, object recognition, counting, color attribution, shape attribution  
+
+We sampled 5,668 questions that belong to 1,000 random data points in the VIT dataset, and analyzed their compositional complexity using Gemini-2.0-Flash [36]. The mean compositional complexity of the questions is approximately $k=1.5$ , and the mode is $k=1$ : $59.2\%$ of the questions utilize only one capability, and an additional $30.9\%$ use 2 capabilities. Together, about $90\%$ of the questions require 2 or less visual atomic capabilities. This complexity cliff in the LLAVA-665K [24] VIT dataset characterized by the scarcity of higher $k$ questions leads to steep declines in its downstream performance on higher $k$ tasks. (Fig. 4). The performance gap between COMPACT and the VIT for different $k$ values shows that the VIT's complexity-agnostic training leaves models unprepared for tasks that require compositional generalization.  
+
+Interestingly, a small fraction of the questions $(0.2\%)$ require as many as 10 capabilities (e.g., "Question: Describe this photo in detail.). We also observe that $1.1\%$ of the questions require zero capabilities, as illustrated in Fig. 10. We further provide $k=0$ examples in Appendix $\S C$ . Fig. 5 shows the relative frequencies of atomic capabilities in the question samples. Object recognition $(38.97\%)$ and scene understanding $(28.58\%)$ are the most common. Other notable capabilities include spatial relationship $(25.14\%)$ , text recognition $(24.68\%)$ , and color attribution $(14.40\%)$ . Less frequent capabilities include object interaction $(6.55\%)$ , action recognition $(6.05\%)$ , counting $(2.95\%)$ , shape attribution $(1.13\%)$ , and spatial recognition $(1.06\%)$  
+
+![](images/e736e5864f313276286390f3137ad6cf5055e5146de2162c97cd28e2859ec7df.jpg)  
+Figure 5. Comparison of Capability Distribution. The heatmaps show the frequency of each atomic capability in LLaVA (left) and COMPACT (right) samples. The capabilities are sorted by frequency based on the LLaVA capability distribution, with more common capabilities appearing closer to the top. In LLaVA, the distribution is notably imbalanced: object recognition and scene understanding are some of the most frequent, while shape and spatial recognition are less prevalent. In contrast, our COMPACT exhibits a more balanced distribution across all capability categories.  
+
+# 4.4. Ablation Studies  
+
+We conduct a series of ablation studies to investigate key design considerations (compositional complexity distribution, atomic capability coverage, compositional complexity range, and instruction tuning ratio) in COMPACT. Unless otherwise specified, all experiments use $5\%$ of LLAVA665K [24] VIT data and 16K $k\ =\ 1,2,3$ compositional tuning data.  
+
+Effect of Matching LLAVA-665K Distribution. In order  
+
+<html><body><table><tr><td>Recipe</td><td>#Data</td><td>InfoVQA [27]</td><td>SeedBench2Plus [17]</td><td>MME[9]</td><td>TextVQA [35]</td><td>MMVet [43]</td><td>CV-Bench [37]</td><td>MMStar [6]</td><td>LLaVA-W [24]</td><td>Rel. (%)</td></tr><tr><td>LLAVA-665K [24]</td><td>665K</td><td>20.80</td><td>41.72</td><td>1478.48</td><td>46.99</td><td>29.22</td><td>60.92</td><td>35.11</td><td>68.50</td><td>100.00</td></tr><tr><td>Random</td><td>49K</td><td>20.33</td><td>42.38</td><td>1290.45</td><td>42.22</td><td>30.18</td><td>54.75</td><td>34.3</td><td>70.5</td><td>96.28</td></tr><tr><td>Unbalanced COMPACT</td><td>49K</td><td>22.28</td><td>41.17</td><td>1339.24</td><td>43.08</td><td>29.22</td><td>55.84</td><td>34.8</td><td>64.5</td><td>96.62</td></tr><tr><td>COMPACT</td><td>49K</td><td>22.68</td><td>42.82</td><td>1362.68</td><td>43.73</td><td>30.78</td><td>54.69</td><td>35.59</td><td>66.6</td><td>98.83</td></tr></table></body></html>  
+
+Table 3. Matching LLAVA-665K Distribution. Performance comparison of unbalanced COMPACT and multipl baselines. The distribution of compositional complexity in unbalanced COMPACT fllows LLAVA-665K [24]. Training a model on unbalanced COMPACT leads to performance on par with training on the random baseline which is a subset of LLVA-665K [24] equal i size, suggesting that a balanced distribution of $k$ in compositional tuning data is critical in compositional generalization.  
+
+![](images/2971f8b6ce3183dfa8a1964b7e9ad1416021e6ab40cf83bb6a9b88589cf6e58d.jpg)  
+Figure 6. Leave-One-Out Analysis on Atomic Capabilities. We measure the average performance degradation across benchmarks by excluding an atomic capability from training. Higher drop indicates higher importance of the atomic capability. Excluding scene understanding and spatial relationships have the largest impact. while that of excluding shape and action recognition are modest.  
+
+to show that the performance improvement of COMPACT mainly comes from the balanced distribution of compositional complexity in the compositional tuning data, we ana1yze the impact on performance when its compositional complexity is unbalanced. We further generate a 16K-sample compositional tuning data whose distribution of $k$ resembles that of LLAVA-665K [24], which is heavily skewed as in Fig. 10. This gives us $58,168\ k\ =\ 1$ $30,364\ k\ =\ 2$ n and $7,468\textit{k}=3$ conversations.  Similar to the original COMPACT data recipe, we mix the unbalanced 16K compositional tuning data with the random $5\%$ subset of the VIT data. We compare this unbalanced COMPACT training dataset with the following baselines: 1) a same size random subset of the VIT data, 2) the original COMPACT with 16K balanced compositional tuning data, and 3) the full VIT dataset. As shown in Tab. 3, the performance of unbalanced COMPACT stands at $96.62\%$ (in relation to the full baseline), close to the random baseline at $96.28\%$ .However, the performance of original COMPACT jumps to $98.83\%$ C suggesting that most of the performance gain in COMPACT comes from the fair representation of higher $k$ samples in the compositional tuning data.  
+
+Impact of Atomic Capability Coverage. To validate our choice of atomic capabilities and understand their relative importance, we conduct a leave-one-out analysis by systematically excluding questions that require a specific capability while keeping the total number of training examples fixed. As shown in Fig. 6, scene understanding and spatial relationship emerge as the most critical capabilities, with each of their exclusion leading to a significant performance drop - $5.22\%$ and $4.93\%$ respectively). Text recognition and object recognition are also essential ( $4.65\%$ and $4.03\%$ drops). The exclusion of capabilities like shape attribution and action recognition have a smaller impact ( $0.74\%$ and 2. $08\%$ 7 This analysis validates our selection of atomic capabilities by demonstrating that each capability contributes meaningfully to overall performance without being redundant.  
+
+![](images/7173e5b428428445691d5c0518af044ff837a0fb6c71d253bd83a14a80b67c62.jpg)  
+Figure 7.  Compositional Complexity Analysis:  Performance comparison of models trained with different compositional complexities. $k=1$ refers to only one atomic capability per question, $k=1,2$ to both single and dual capabilities, and $k=1,2,3$ to single, dual, and triple capabilities. Results show consistent improvements as the range of compositional complexities increases.  
+
+Effect of Compositional Complexity Range. To isolate the effect of the range of compositional complexities while controlling for data quality, we generate three sets of 16Ksample compositional tuning data, each with $k=1$ $k=$ 1,2 or $k=1,2,3$ , using identical Gemini-2.0-Flash [36] configurations. For fair comparison, we maintain consistent sample counts and use an identical set of images in all three settings. The model trained on only $k=1$ (single capability per question) underperforms the model trained on $k=1,2,3$ compositional tuning data on multi-capability benchmarks: MM-Vet [43] (28.82 vs. 29.22), LLaVA-W [24] (66.1 vs. 68.5) and MMStar [6] (34.53 vs. 35.11). This shows that although the model trained on $k=1$ data can solve tasks with lower compositional complexity, it struggles to perform in higher compositional complexities.  
+
+As shown in Fig. 7, increasing the range of compositional complexities leads to consistent improvements on all three benchmarks. Training on $k=1,2,3$ compositional tuning data achieves the highest performance on MM-Vet [43] (32.61) and MMStar [6] (0.3577), demonstrating that exposure to more complex compositional patterns during training enhances the model's ability to handle complex multicapability tasks. Surprisingly, the model achieves $112\%$ performance on MM-Vet [43] with only $16\mathrm{k}$ compositional tuning data compared to the LLAVA-665K [24] baseline, suggesting that a balanced mixture of different compositional complexities improves data efficiency.  
+
+Impact of Instruction Tuning Data Ratio.  We vary the amount of instruction tuning data sampled from the LLA VA665K [24] VIT data to understand the impact of the mixing ratio on model performance. In order to isolate the effect on visual instruction following, we exclude $k=0$ conversations (approximately $1.1\%$ of the questions), which have minimal relevance to visual capabilities. As we scale the VIT subset from $0\%$ (pure compositional tuning) to $7\%$ of LLAVA-665K [24], we observe an upward trend in performance, indicating that the role of the instruction tuning data is crucial. Fig. 8 shows that without instruction tuning data $(0\%)$ , COMPACT achieves only $74.69\%$ of the performance relative to LLAVA-665K [24] VIT. Increasing the instruction tuning data to just $1\%$ of the VIT data significantly improves the relative performance to $96.56\%$ .However, further scaling gives diminishing returns, with $3\%$ reaching $98.77\%$ and $5\%$ achieving nearly identical relative performance $(99.99\%)$ . Interestingly, taking $7\%$ from the VIT data causes a slight decrease to $98.07\%$ , indicating that $5\%$ represents an optimal balance between instruction tuning and compositional tuning data in terms of data efficiency and performance. These results suggest that instruction following capability is potentially orthogonal to the capabilities of the base model and the atomic visual capabilities, and can be acquired with minimal instruction tuning data.  
+
+# 5. Discussion  
+
+Conclusion. In this work, we introduce COMPACT, a data recipe that systematically combines atomic visual capabilities (e.g., object recognition, spatial reasoning, shape attribution) into composite capabilities to solve complex multimodal tasks. Our experimental results show that explicit training on compositions of atomic capabilities matches the full LLAVA-665K [24] VIT in performance across benchmarks with less than $10\%$ of its data budget. Our work presents the potential of structured compositional learning as a scalable, data-efficient pathway toward multimodal models that can solve complex, multi-capability tasks via compositional generalization.  
+
+![](images/d6c3114c4562ce1c01b13362e9ab295a5e70980a2a942cf27319d49c4254000b.jpg)  
+Figure 8. Impact of Instruction Tuning Data Ratio on Performance. Relative performance of models trained on COMPACT mixed with different ratios instruction tuning data from LLAVA665K [24]. The $\mathbf{x}$ -axis is the percentage of LLAVA-665K [24] used as instruction tuning data, and the y-axis is the average relative score across benchmarks. The performance improves significantly with a small percentage of instruction tuning data and stabilizes around $5\%$  
+
+Limitations. Our approach faces two key limitations. First, we rely on data generated from closed-source models (i.e., Gemini), which potentially introduce their compositional limitations and biases to our dataset. Additionally, this data generation process is costly, which could pose challenges for reproducibility. To support future research, we will publicly release the data generated in this project. Second, our approach focuses on the compositionality of vision-centric capabilities. Therefore, our approach may not be optimal for addressing knowledge-intensive tasks that lie outside the scope of visual reasoning. See Appendix $\S\mathrm{A}$ for a detailed discussion on knowledge-intensive task results.  
+
+Future Work. We aim to extend COMPACT to accommodate higher-order compositional complexity. $(\mathbf{k}>3)$ . Currently, our data recipe only generates data up to $\mathbf{k}=3$ due to the decreasing reliability of closed-source models at higher compositional complexities. Specifically, as the number of atomic capabilities increases, their integration tends to be more inconsistent, ambiguous, or erroneous. Future work could explore hierarchical composition approaches or hybrid data generation pipelines that combine multiple sources and verification steps to improve performance on higher compositional complexities. Additionally, experimenting with explicit reasoning approaches (e.g., step-by-step decomposition [33]) could further improve the model's ability to solve complex tasks while retaining data efficiency.  
+
+Acknowledgments. This material is based upon work supported by the National Science Foundation under Grant 2107048 and 2112562. Any opinions, findings, and conclusions, or recommendations expressed in this material are those of the author(s) and do not necessarily reflect the views of the National Science Foundation. All experiments, data collection, and processing activities were conducted at Princeton University. Meta was involved solely in an advisory role and no experiments, data collection or processing activities were conducted on Meta infrastructure. We thank Allison Chen for helpful discussions and feedback.  
+
+# References  
+
+[1] Jean-Baptiste Alayrac, Jeff Donahue, Pauline Luc, Antoine Miech, Iain Barr, Yana Hasson, Karel Lenc, Arthur Mensch, Katherine Millican, Malcolm Reynolds, et al. Flamingo: a visual language model for few-shot learning. Advances in neural information processing systems, 35:23716-23736, 2022. 1   
+[2] Jinze Bai, Shuai Bai, Shusheng Yang, Shijie Wang, Sinan Tan, Peng Wang, Junyang Lin, Chang Zhou, and Jingren Zhou. Qwen-vl: A versatile vision-language model for understanding, localization. Text Reading, and Beyond, 2, 2023.   
+[3] Nishant Balepur, Rachel Rudinger, and Jordan Lee BoydGraber. Which of these best describes multiple choice evaluation with llms? a) forced b) flawed c) fixable d) all of the above. arXiv preprint arXiv:2502.14127, 2025. 2   
+[4] Declan Campbell, Sunayana Rane, Tyler Giallanza, Camillo Nicolo De Sabbata, Kia Ghods, Amogh Joshi, Alexander Ku, Steven Frankland, Tom Griffiths, Jonathan D Cohen, et al. Understanding the limits of vision language models through the lens of the binding problem. Advances in Neural Information Processing Systems, 37:113436-113460, 2025. 2   
+[5] Hyunsik Chae, Seungwoo Yoon, Chloe Yewon Chun, Gyehun Go, Yongin Cho, Gyeongmin Lee, and Ernest K Ryu. Decomposing complex visual comprehension into atomic visual skills for vision language models. In The 4th Workshop on Mathematical Reasoning and AI at NeurIPS'24. 2   
+[6] Lin Chen, Jinsong Li, Xiaoyi Dong, Pan Zhang, Yuhang Zang, Zehui Chen, Haodong Duan, Jiaqi Wang, Yu Qiao, Dahua Lin, et al. Are we on the right way for evaluating large vision-language models? arXiv preprint arXiv:2403.20330, 2024. 2, 5, 6, 8, 9, 1   
+[7] Mingyang Chen, Haoze Sun, Tianpeng Li, Fan Yang, Hao Liang, Keer Lu, Bin Cui, Wentao Zhang, Zenan Zhou, and Weipeng Chen. Facilitating multi-turn function calling for lIms via compositional instruction tuning. arXiv preprint arXiv:2410.12952, 2024. 2   
+[8] Jerry A. Fodor and Ernest LePore, editors. The Compositionality Papers. Oxford University Press, 2002. 2   
+[9] Chaoyou Fu, Peixian Chen, Yunhang Shen, Yulei Qin, Mengdan Zhang, Xu Lin, Zhenyu Qiu, Wei Lin, Jinrui Yang, Xiawu Zheng, et al. Mme: a comprehensive evaluation benchmark for multimodal large language models. corr abs/2306.13394 (2023), 2023. 4, 5, 8, 1   
+10] Sreyan Ghosh, Chandra Kiran Reddy Evuru, Sonal Kumar, Deepali Aneja, Zeyu Jin, Ramani Duraiswami, Dinesh Manocha, et al. A closer look at the limitations of instruction tuning. arXiv preprint arXiv:2402.05119, 2024. 2   
+11] Jia He, Mukund Rungta, David Koleczek, Arshdeep Sekhon, Franklin X Wang, and Sadid Hasan. Does prompt formatting have any impact on llm performance? arXiv preprint arXiv:2411.10541, 2024. 2   
+12] Cheng-Yu Hsieh, Jieyu Zhang, Zixian Ma, Aniruddha Kembhavi, and Ranjay Krishna. Sugarcrepe: Fixing hackable benchmarks for vision-language compositionality. Advances in neural information processing systems, 36:31096-31116, 2023. 2   
+[13] Hang Hua, Yunlong Tang, Ziyun Zeng, Liangliang Cao, Zhengyuan Yang, Hangfeng He, Chenliang Xu, and Jiebo Luo. Mmcomposition: Revisiting the compositionality of pre-trained vision-language models. arXiv preprint arXiv:2410.09733, 2024. 2   
+[14] Jiaxing Huang, Jingyi Zhang, Kai Jiang, Han Qiu, and Shijian Lu. Visual instruction tuning towards general-purpose multimodal model: A survey. arXiv preprint arXiv:2312.16602, 2023. 2   
+[15] Kaiyi Huang, Kaiyue Sun, Enze Xie, Zhenguo Li, and Xihui Liu. T2i-compbench: A comprehensive benchmark for openworld compositional text-to-image generation. Advances in Neural Information Processing Systems, 36:78723-78747, 2023. 3   
+[16] Jaewoo Lee, Boyang Li, and Sung Ju Hwang. Concept-skill transferability-based data selection for large vision-language models. arXiv preprint arXiv:2406.10995, 2024. 2   
+[17] Bohao Li, Yuying Ge, Yi Chen, Yixiao Ge, Ruimao Zhang, and Ying Shan. Seed-bench-2-plus: Benchmarking multimodal large language models with text-rich visual comprehension. arXiv preprint arXiv:2404.16790, 2024. 5, 6, 8,   
+[18] Bo Li, Yuanhan Zhang, Dong Guo, Renrui Zhang, Feng Li, Hao Zhang, Kaichen Zhang, Peiyuan Zhang, Yanwei Li, Ziwei Liu, et al. Llava-onevision: Easy visual task transfer. arXiv preprint arXiv:2408.03326, 2024. 2   
+[19] Junnan Li, Dongxu Li, Caiming Xiong, and Steven Hoi. Blip: Bootstrapping language-image pre-training for unified vision-language understanding and generation. In International conference on machine learning, pages 12888-12900. PMLR, 2022. 1   
+[20] Ming Li, Pei Chen, Chenguang Wang, Hongyu Zhao, Yijun Liang, Yupeng Hou, Fuxiao Liu, and Tianyi Zhou. Mosaic-it: Free compositional data augmentation improves instruction tuning. arXiv preprint arXiv:2405.13326, 2024. 2   
+[21] Zhiqi Li, Guo Chen, Shilong Liu, Shihao Wang, Vibashan VS, Yishen Ji, Shiyi Lan, Hao Zhang, Yilin Zhao, Subhashree Radhakrishnan, et al. Eagle 2: Building post-training data strategies from scratch for frontier vision-language models. arXiv preprint arXiv:2501.14818, 2025. 1   
+[22] Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee. Visual instruction tuning. Advances in neural information processing systems, 36:34892-34916, 2023. 1, 2   
+[23] Haotian Liu, Chunyuan Li, Yuheng Li, and Yong Jae Lee. Improved baselines with visual instruction tuning. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 26296-26306, 2024. 1   
+[24] Haotian Liu, Chunyuan Li, Yuheng Li, and Yong Jae Lee. Improved baselines with visual instruction tuning. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 26296-26306, 2024. 1, 2, 3, 4, 5, 6, 7, 8, 9   
+[25] Haotian Liu, Chunyuan Li, Yuheng Li, Bo Li, Yuanhan Zhang, Sheng Shen, and Yong Jae Lee. Llava-next: Improved reasoning, ocr, and world knowledge, 2024. 1   
+[26] Zikang Liu, Kun Zhou, Wayne Xin Zhao, Dawei Gao, Yaliang Li, and Ji-Rong Wen. Less is more: High-value data selection for visual instruction tuning. arXiv preprint arXiv:2403.09559, 2024. 2   
+[27] Minesh Mathew, Viraj Bagal, Ruben Tito, Dimosthenis Karatzas, Ernest Valveny, and CV Jawahar. Infographicqa. In Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision, pages 1697-1706, 2022. 5, 6, 8,1   
+[28] Timothy Ossowski, Ming Jiang, and Junjie Hu. Prompting large vision-language models for compositional reasoning. arXiv preprint arXiv:2401.11337, 2024. 2   
+[29] Simon Park, Abhishek Panigrahi, Yun Cheng, Dingli Yu, Anirudh Goyal, and Sanjeev Arora. Generalizing from simple to hard visual reasoning: Can we mitigate modality imbalance in vlms?  arXiv preprint arXiv:2501.02669, 2025.   
+[30] Arijit Ray, Karan Sikka, Ajay Divakaran, Stefan Lee, and Giedrius Burachas. Sunny and dark outside?! improving answer consistency in vqa through entailed question generation. arXiv preprint arXiv:1909.04696, 2019. 1   
+[31] Eva Sanchez Salido, Julio Gonzalo, and Guillermo Marco. None of the others: a general technique to distinguish reasoning from memorization in multiple-choice llm evaluation benchmarks. arXiv preprint arXiv:2502.12896, 2025. 2   
+[32] Ramprasaath R Selvaraju, Purva Tendulkar, Devi Parikh, Eric Horvitz, Marco Tulio Ribeiro, Besmira Nushi, and Ece Kamar. Squinting at vqa models: Introspecting vqa models with sub-questions. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 10003-10011, 2020. 1   
+[33] Hao Shao, Shengju Qian, Han Xiao, Guanglu Song, Zhuofan Zong, Letian Wang, Yu Liu, and Hongsheng Li. Visual cot: Advancing multi-modal language models with a comprehensive dataset and benchmark for chain-of-thought reasoning. Advances in Neural Information Processing Systems, 37:8612-8642, 2025. 9   
+[34] Min Shi, Fuxiao Liu, Shihao Wang, Shijia Liao, Subhashree Radhakrishnan, De-An Huang, Hongxu Yin, Karan Sapra, Yaser Yacoob, Humphrey Shi, et al. Eagle: Exploring the design space for multimodal llms with mixture of encoders. arXiv preprint arXiv:2408.15998, 2024. 1   
+[35] Amanpreet Singh, Vivek Natarajan, Meet Shah, Yu Jiang, Xinlei Chen, Dhruv Batra, Devi Parikh, and Marcus Rohrbach. Towards vqa models that can read. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition, pages 8317-8326, 2019. 5, 6, 8, 1   
+[36] Gemini Team, Rohan Anil, Sebastian Borgeaud, JeanBaptiste Alayrac, Jiahui Yu, Radu Soricut, Johan Schalkwyk, Andrew M Dai, Anja Hauth, Katie Millican, et al. Gemini: a family of highly capable multimodal models. arXiv preprint arXiv:2312.11805, 2023. 3, 4, 6, 7, 8, 1   
+[37] Peter Tong, Ellis Brown, Penghao Wu, Sanghyun Woo, Adithya Jairam Vedagiri IYER, Sai Charitha Akula, Shusheng Yang, Jihan Yang, Manoj Middepogu, Ziteng Wang, et al. Cambrian-1: A fully open, vision-centric exploration of multimodal llms. Advances in Neural Information Processing Systems, 37:87310-87356, 2025. 1, 5, 8   
+[38] Jason Wei, Maarten Bosma, Vincent Y Zhao, Kelvin Guu, Adams Wei Yu, Brian Lester, Nan Du, Andrew M Dai, and Quoc V Le. Finetuned language models are zero-shot learners. arXiv preprint arXiv:2109.01652, 2021. 2   
+[39] Xindi Wu, Mengzhou Xia, Rulin Shao, Zhiwei Deng, Pang Wei Koh, and Olga Russakovsky. Icons: Influence consensus for vision-language data selection. arXiv preprint arXiv:2501.00654, 2024. 2, 5, 6   
+[40] Xindi Wu, Dingli Yu, Yangsibo Huang, Olga Russakovsky, and Sanjeev Arora. Conceptmix: A compositional image generation benchmark with controllable difficulty. arXiv preprint arXiv:2408.14339, 2024. 1, 3   
+[41] Lingling Xu, Haoran Xie, Si-Zhao Joe Qin, Xiaohui Tao, and Fu Lee Wang. Parameter-efficient fine-tuning methods for pretrained language models: A critical review and assessment. arXiv preprint arXiv:2312.12148, 2023. 2   
+[42] Zhuoyan Xu, Zhenmei Shi, and Yingyu Liang. Do large language models have compositional ability? an investigation into limitations and scalability. arXiv preprint arXiv:2407.15720, 2024. 2   
+[43] Weihao Yu, Zhengyuan Yang, Linjie Li, Jianfeng Wang, Kevin Lin, Zicheng Liu, Xinchao Wang, and Lijuan Wang. Mm-vet: Evaluating large multimodal models for integrated capabilities. arXiv preprint arXiv:2308.02490, 2023. 2, 5, 6, 8,9,1   
+[44] Aimen Zerroug, Mohit Vaishnav, Julien Colin, Sebastian Musslick, and Thomas Serre. A benchmark for compositional visual reasoning. Advances in neural information processing systems, 35:29776-29788, 2022. 2   
+[45] Haoyu Zhao, Simran Kaur, Dingli Yu, Anirudh Goyal, and Sanjeev Arora. Can models learn skill composition from examples? Advances in Neural Information Processing Systems, 37:102393-102427, 2024. 2   
+[46] Jeffrey Zhou, Tianjian Lu, Swaroop Mishra, Siddhartha Brahma, Sujoy Basu, Yi Luan, Denny Zhou, and Le Hou. Instruction-following evaluation for large language models. arXiv preprint arXiv:2311.07911, 2023. 2  
+
+# Appendix  
+
+In this supplementary material, we provide additional analysis (\$A). We also detail the implementation process of our compositional question generation and verification step (\$B). Finally, we include visualizations $\mathrm{(\SC)}$ that demonstrate the effectiveness of compositional tuning through comparative case studies.  
+
+# A. Additional Analysis  
+
+Analysis of Conversation Length Distribution in LLAVA665K. Fig. 9 shows the distribution of the number of conversations per image in LLAVA-665K [24]. $93.6\%$ of the samples fall below the 10-pair threshold. The distribution's mean of 5.18 conversations per image ${\mathit{\Phi}}_{\left(\sigma\right.}=5.62{\mathit{\Phi}}_{.}$ ) shows that the data is heavily skewed towards lower values. We fix the target number of conversations per image in the compositional tuning dataset based on these findings. We ensure a fair comparison by aligning the distribution of our data with the baseline distribution.  
+
+![](images/df20a1900c71739d07ffdff1b59fd0bc53ea3d08f2462f675ddebe0d5a4efc9f.jpg)  
+Figure 9. Distribution of conversations per image in LLAVA665K. The overwhelming majority of images $(97.69\%)$ have $\leq20$ conversation pairs. The average of number of conversations per image is 5.18 $(\sigma=5.62)$ .A small subset $(2.31\%)$ exceeds 20 conversations, which includes a sample with the maximum length of 275. Total conversations: 3,444,246.  
+
+Analysis of Limited Performance Gains on KnowledgeIntensive Tasks. While our compositional tuning approach shows general improvements on various benchmarks, we observe more modest gains in knowledge-intensive tasks. Table 4 compares the performance of different approaches on OK-VQA, MMMU, and MMMU-Pro benchmarks. COMPACT with 32k compositional tuning data shows relatively small improvements over the random baseline: OK-VQA $(50.02\%$ vs $49.30\%$ , MMMU $(33.89\%$ vs $32.89\%$ , and MMMU-Pro $20.23\%$ vs $18.15\%$ on standard tasks, $11.91\%$ vs $11.44\%$ on vision tasks). Notably, training on the full LLAVA-665K [24] VIT dataset leads to limited performance improvements on MMMU $(33.89\%)$ .Although knowledge-related tasks are not our main focus, this inspires future work on designing compositional tuning approaches that cover broader capabilities outside of the vision space.  
+
+Analysis of Compositional Complexities of Multi-Capability Benchmarks The average compositional complexity $\bar{k}$ varies among benchmarks.We use Gemini-2.0-Flash [36] to analyze each question and identify the atomic capabilities required to give an answer (see the details of the system prompt in $\S_{\mathrm{B}}$ ). We average these numbers for each benchmark to compute benchmarkspecific $\bar{k}$ values. This reveals varying levels of compositional complexities across benchmarks: InfoVQA [27] $\bar{k}=0.\bar{3}4)$ , SeedBench2Plus [17] $\bar{\boldsymbol{k}}=1.11\rangle$ , MME [9] $\bar{\boldsymbol{k}}=1.16)$ , TextVQA [35] $\bar{(k}=1.19)$ , MMVet [43] $\bar{\boldsymbol{k}}=1.24)$ , CV-Bench [37] $\bar{\langle k\:}=1.33)$ MMStar [6] $\bar{\boldsymbol{k}}=1.40)$ , and LLaVA-W [24] $\bar{\boldsymbol{k}}=3.05\mathrm{\mathrm{)}}$  
+
+![](images/ead90aab3789a37cbed43f6eaa8e786ba01156841ce977719fac89d071a84e3d.jpg)  
+Figure 10. Distribution of Compositional Complexities in LLAVA-665K samples. Majority of questions $(59.2\%)$ use one atomic capability, followed by $30.9\%$ using two.  
+
+Table 4. Limited Performance Improvements on KnowledgeIntensive Benchmarks. Comparison shows modest improvements over random baseline on tasks that require substantial world knowledge or domain expertise. Numbers reported in accuracy $(\%)$ and relative performance to full model $(\%)$   
+
+
+<html><body><table><tr><td rowspan="2">Model</td><td rowspan="2">OK-VQA</td><td rowspan="2">MMMU</td><td colspan="2">MMMU-Pro</td><td rowspan="2">Rel. (Avg.)</td></tr><tr><td>Standard</td><td>Vision</td></tr><tr><td>Random</td><td>49.30</td><td>32.89</td><td>18.15</td><td>11.44</td><td>92.0%</td></tr><tr><td>COMPACT</td><td>50.02</td><td>33.89</td><td>20.23</td><td>11.91</td><td>96.6%</td></tr><tr><td>LLAVA-665K[24]</td><td>57.96</td><td>33.89</td><td>20.12</td><td>11.97</td><td>100%</td></tr></table></body></html>  
+
+# B. Additional Experiment Details  
+
+We provide the system prompt for our capability analysis where we identify all the required capabilities for a given question (A). We also provide the system prompts for compositional question generation (B) and verification (C). The generation prompt includes structured guidelines to ensure that the generated multi-capability questions naturally blend different capabilities and can only be answered by checking the corresponding images. The verification prompt checks if the questions meet these guidelines and do not contain subjective interpretations or compositional flaws.  
+
+Prompt: You are an AI assistant that analyzes questions to identify the core capabilities required to answer them. Given a question, identify ALL the capabilities it requires from this list:  
+
+- spatial relationship (understanding relative positions)   
+- object interaction (how objects/people interact)   
+- object relationship (relationships between objects)   
+- text recognition (reading text in images)   
+- spatial recognition (understanding 3D space)   
+- action recognition (identifying actions/activities)   
+- object recognition (identifying objects)   
+- counting (counting objects/people)   
+- color (identifying colors)   
+- shape (identifying shapes)  
+
+Return ONLY a JSON array of the required capabilities, like: ["capability1", "capability2]  
+
+# C. Visualizations  
+
+Qualitative Comparison. We provide qualitative visualizations that compare the outputs from our compositionally-tuned COMPACT model and the LLAVA-665K VIT model. Examples in Fig. 11 highlight the importance of compositional tuning for handling complex multi-capability tasks $(k\geq3)$ . These cases demonstrate COMPACT model's enhanced ability to integrate multiple visual capabilities, while showing the baseline model's difficulty with such compositionally complex queries.  
+
+# (C) System Prompt for Question Verification  
+
+Prompt: You are an AI assistant that verifies if questions about images properly utilize specified capabilities. Given a question and its answer, analyze whether it NATURALLY requires using EXACTLY k specified capabilities - no more, no less.  
+
+# IMPORTANT:  
+
+: The question should require ALL specified capabilities to be answered   
+. The question should not require additional major capabilities beyond those specified   
+.The capabilities must be naturally integrated, not artificially forced  
+
+Zero-Capability Samples in LLAVA-665K. We identify a subset of samples in the LLAVA-665K dataset that require no visual capabilities, which we refer to as zero-capability samples. These include general knowledge queries, subjective prompts, or requests that can be answered without inspecting the image at all. While such data may still be useful for instruction following, it does not contribute to the development of vision-centric skills. In our analysis, we find that approximately $1.1\%$ of the questions in LLAVA665K fall into this zero-capability category.  
+
+# Zero-Capability Questions:  
+
+.How is the weather?   
+.Should I move to London?   
+: Can you provide some information about the Emirates airline?   
+: Give me a long list of what duties are considered rental activity   
+.Have the cat declare her new name as ruler   
+: rewrite it from the perspective of an expensive therapist   
+: Can you tell me how to prepare a Colombian dish   
+: how to do coding   
+.Can you explain Map Reduce to me?   
+: A 35 year old patient presented to the emergency department with shortness of breath. Before this, he was at a crowded event. He does not have a history of diabetes or high blood pressure. He had a positive PCR test at an outside hospital. What should be the next steps for the physician?   
+. please convert those snomed codes to FHIR   
+: I'm running a used car dealership, what are some emerging opportunities for me brought by large language models like GPT-3?   
+answer it again in Chinese   
+you are a legislator. You are asked to come up with a framework for new legislation that adances the science of reading for grades K-3. Write that model legislation.   
+I'm looking to create a podcast, can you help me?  
+
+COMPACT Data Visualization. We provide a visualization of the COMPACT dataset to provide insights into its compositional structure.  Figs. 12, 13, and ?? show selected examples from COMPACT dataset. Each question is generated from a combination of $k$ atomic capabilities. These cases demonstrate our model's enhanced ability to integrate multiple visual capabilities simultaneously, while the baseline model often struggles with such compositionally complex queries.  
+
+Prompt: You are an AI ssistant that generates challenging but well-defined questions and answers about images. First, I will provide you with k specific capabilities. Generate 1 question that naturally integrates EXACTLY these k capabilities.  
+
+# IMPORTANT:  
+
+: If the question can be answered without looking at the image (e.g., the answer can be inferred from the que. questions), it's a BAD question   
+: Questions should be reasonably challenging but must have clear, unambiguous answers   
+: All answers must be extremely concise - use only a single word or short phrase   
+: Each question must be a single, integrated question that naturally combines all k given capabilities : DO NOT use "and" or commas to combine separate questions   
+: Questions should require careful observation and reasoning   
+: Only generate questions when you can determine the answer with high confidence   
+. Avoid subjective or ambiguous questions   
+: ONLY ask about objects and capabilities that are ACTUALLY PRESENT in the image   
+: NEVER create questions about objects or features that don't exist in the image   
+Generate diverse questions that differ in topic and required reasoning  
+
+# CAPABILITY DEFINITIONS:  
+
+spatial relationship: Identifying how specific obects are positioned relative to each other (above, below, next to, inside, etc.) - focuses on the direct relationship between two or more particular objects   
+spatial recognition: Understanding the overall spatil layout and arrangement of the entire scene - focuses on the general organization, depth, perspective, or environmental context, rather than relationships between specific objects   
+: text.recognition: Reading and interpreting text visible in the image   
+: action recognition: Identifying what action is being performed (can involve a single person/object)   
+object interaction: Analyzing how multiple objects interact with each other (requires at least two objects) - MUsT involve at least one moving/active object, not just static objects positioned together - can include humans interacting with objects and humans interacting with humans   
+: object_recognition: Identifying and naming objects present in the image   
+: counting: Determining the number of instances of something in the image   
+: color: Identifying or comparing colors of objects in the image   
+: shape: Recognizing and describing the shapes of objects in the image   
+scene understanding: Identifying where the image istaken or the type of environment/setting (indoor/outdoor, beach, mountain, kitchen, office, etc.) - focuses on identifying the overall scene, background, or context of the image  
+
+# Examples:  
+
+: BAD: "What color is the car, and where is it located? (two separate questions)   
+: BAD: "What might the person be thinking? (subjective/ambiguous)   
+: BAD: "Is this a nice room? (subjective)   
+:BAD: What breed of dog is in the corner?" (when no dog exists in the image)   
+: BAD: How are the fridge and desk interacting? (static objects don't qualify as interaction)   
+BAD: What is the color of the red car?" (answer can be inferred from the question itself without seeing the image)   
+: GOoD: "What color car is parked next to the red brick building?" (specific, clear answer)   
+: GOOD: \*How many yellow tennis balls are visible on the wooden court?" (requires counting $^+$ color)   
+: GOOD: What is the person in blue using to interact with the television?" (proper object interaction)   
+: GOOD: "Where is this image taken? (scene understanding)   
+: GOOD: "Where is this scene happening? (scene understanding)  
+
+![](images/b9aa0b777d4edaa3e37cc2e99cb3f68e43587e0a4cef7552f345375be18366d2.jpg)  
+Figure 11. Qualitative comparison of model outputs. Examples showing responses from our compositionall-uned COMPACT model and LLAVA-665K [24] VIT model on complex queries that require multiple capabilities $\langle k\geq3\rangle$ . Our model demonstrates better integration of visual capabilities which leads to more accurate responses.  
+
+![](images/b3481b100f39164b6ba3ccd8cdbcc4f2a94c381660df3403168234739c22e34a.jpg)  
+Figure 12. Visualization of COMPACT Compositional Tuning Samples.  
+
+![](images/19bd2107ee401e73f01810dfd3a37f8f415ba9a850c00142f61ae99b6cbeb515.jpg)  
+Figure 13. Visualization of COMPACT Compositional Tuning Samples.  

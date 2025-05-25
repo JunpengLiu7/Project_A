@@ -1,0 +1,30 @@
+# ✅ 完整项目依赖（合并稳定版本 + 用户 Mineru 多模态支持）
+
+# 基础依赖
+langchain==0.0.340
+openai==0.28.0
+arxiv==2.1.0
+python-dotenv==1.0.0
+pandas==2.0.3
+requests==2.31.0
+chromadb==0.4.15
+tiktoken==0.5.1
+
+# NLP & Embedding 模型
+transformers==4.30.2
+torch==2.1.0
+sentence-transformers==2.2.2
+huggingface_hub==0.16.4
+numpy==1.26.4
+
+# 图像处理 & Mineru 相关（如有使用）
+pillow>=9.0.0
+paddleocr==2.7.3
+paddlepaddle==2.6.1; platform_system=="Windows"
+
+# Markdown 结构生成支持
+markdown
+markdownify==0.11.6
+
+# Gradio 前端问答支持
+gradio==3.44.4
