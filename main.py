@@ -9,6 +9,7 @@ from dotenv import load_dotenv, find_dotenv
 from paper_hunter import PaperHunter
 from analyzer import PaperAnalyzer
 from mineru import ReportGenerator, download_pdf, unzip_file
+from image_indexer import build_image_vector_index
 
 # === 环境变量加载 ===
 env_path = find_dotenv()
@@ -25,14 +26,12 @@ else:
     print("❌ 错误：未能读取 MINERU_API_KEY，请检查 .env 文件")
     exit(1)
 
-# === 清理函数（多级控制） ===
+# === 清理函数 ===
 def clean_workspace_after_process():
     print("\n🧹 清理本轮运行产生的 PDF 和 ZIP...")
     pdf_files = glob.glob("papers/*.pdf")
-    for f in pdf_files:
-        os.remove(f)
     zip_files = glob.glob("Markdown/*.zip")
-    for f in zip_files:
+    for f in pdf_files + zip_files:
         os.remove(f)
     print(f"✅ 删除 {len(pdf_files)} 个 PDF，{len(zip_files)} 个 ZIP")
 
@@ -65,43 +64,40 @@ def main():
     papers = hunter.fetch_arxiv(args.query, args.max_results)
 
     print("📊 正在分析技术趋势...")
-    report = analyzer.analyze_papers(papers)
-    print(report)
+    analyzer.analyze_papers(papers)
 
-    # 下载 PDF
     os.makedirs("papers", exist_ok=True)
-    print(f"\n📥 正在下载 {len(papers)} 篇抓取的论文 PDF...")
+    new_pdf_paths = []
+
+    print(f"\n📥 下载论文 PDF（跳过已有）...")
     for i, row in papers.iterrows():
-        pdf_url = row["pdf_url"]
         title_clean = re.sub(r'[\\/*?:"<>|]', "_", row["title"])
         save_path = f"papers/{title_clean}.pdf"
-        print(f"📄 下载论文 {i + 1}: {title_clean}")
-        if download_pdf(pdf_url, save_path):
-            print(f"✅ 成功: {save_path}")
+        if os.path.exists(save_path):
+            print(f"⏭️ 跳过已存在: {title_clean}")
         else:
-            print(f"❌ 失败: {pdf_url}")
+            print(f"📄 下载论文 {i + 1}: {title_clean}")
+            if download_pdf(row["pdf_url"], save_path):
+                print(f"✅ 成功: {save_path}")
+                new_pdf_paths.append(save_path)
+            else:
+                print(f"❌ 失败: {row['pdf_url']}")
 
-    # 分类 + 嵌入
-    candidate_labels = ["AI", "Machine Learning", "Quantum Computing", "Computer Vision", "Natural Language Processing"]
-    print("\n🔍 正在进行主题分类...")
-    for idx, row in papers.iterrows():
-        theme = analyzer.classify_paper_theme(row['summary'], candidate_labels)
-        print(f"📄 论文 {idx + 1} 主题: {theme}")
-
-    print("\n🛠️ 正在创建向量数据库...")
+    print("\n🛠️ 正在创建文本向量数据库...")
     analyzer.create_vector_db(papers)
-    print("✅ 向量数据库创建完成")
-
-    # Mineru 报告处理
-    print("\n📥 生成报告...")
-    pdf_files = [os.path.join("papers", f) for f in os.listdir("papers") if f.endswith(".pdf")]
-    print("📚 找到 PDF 文件：", pdf_files)
+    print("✅ 文本向量数据库创建完成")
 
     report_generator = ReportGenerator(mineru_api_key)
 
-    for pdf_path in pdf_files:
-        print(f"\n🔍 正在处理: {pdf_path}")
-        result = report_generator.generate_report(report, pdf_path)
+    for pdf_path in new_pdf_paths:
+        name = os.path.basename(pdf_path).replace(".pdf", "")
+        target_dir = os.path.join("Markdown", name)
+        if os.path.exists(target_dir):
+            print(f"⏭️ 跳过已结构化报告: {target_dir}")
+            continue
+
+        print(f"\n📥 正在处理: {pdf_path}")
+        result = report_generator.generate_report("auto", pdf_path)
         if not result:
             print("❌ 报告生成失败，跳过")
             continue
@@ -123,17 +119,22 @@ def main():
             extract_result = extract_results["extract_result"][0]
             download_url = extract_result.get("full_zip_url")
             if download_url:
-                file_name = os.path.basename(pdf_path).replace(".pdf", "")
-                report_zip = os.path.join("Markdown", f"{file_name}.zip")
-                os.makedirs(os.path.dirname(report_zip), exist_ok=True)
-                report_generator.download_results(download_url, report_zip)
-                unzip_file(report_zip)
+                zip_path = os.path.join("Markdown", f"{name}.zip")
+                report_generator.download_results(download_url, zip_path)
+                unzip_file(zip_path)
             else:
                 print("❌ 未获取下载链接")
         else:
             print("❌ 提取失败")
 
-    # === 末尾清理控制 ===
+    print("\n🖼️ 正在构建图像向量数据库...")
+    try:
+        build_image_vector_index(root_dir="Markdown", index_dir="faiss_image_index")
+    except Exception as e:
+        print(f"⚠️ 图像索引构建失败：{e}")
+    else:
+        print("✅ 图像向量数据库更新完成")
+
     if args.clean_all:
         clean_all_workspace()
     elif args.clean:

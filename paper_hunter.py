@@ -15,7 +15,7 @@ class PaperHunter:
         """从arXiv获取论文"""
         try:
             client = arxiv.Client()
-            search = arxiv.Search(
+            search = arxiv.Search(76
                 query=query,
                 max_results=max_results,
                 sort_by=arxiv.SortCriterion.SubmittedDate
